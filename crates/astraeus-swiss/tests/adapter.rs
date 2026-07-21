@@ -260,9 +260,11 @@ fn moshier_finds_known_global_eclipse_maxima_and_casts_event_chart() {
         artifact.maximum().exact_instant()
     );
     let json = artifact.to_json().unwrap();
+    let round_trip = astraeus_events::GlobalEclipseChartArtifact::from_json(&json).unwrap();
+    assert_eq!(round_trip, artifact);
     assert_eq!(
-        astraeus_events::GlobalEclipseChartArtifact::from_json(&json).unwrap(),
-        artifact
+        round_trip.content_id().unwrap(),
+        artifact.content_id().unwrap()
     );
     assert!(
         astraeus_events::GlobalEclipseChartArtifact::from_json(&json.replacen(
