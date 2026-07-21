@@ -22,6 +22,8 @@ fn moshier_matches_tropical_and_sidereal_references() {
     for name in [
         "j2000-greenwich-tropical-placidus",
         "j2000-greenwich-sidereal-lahiri-placidus",
+        "2024-new-york-tropical-koch",
+        "2024-new-york-sidereal-fagan-koch",
     ] {
         let fixture = fixture(name);
         fixture
