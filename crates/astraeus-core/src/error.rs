@@ -27,6 +27,10 @@ pub enum ValidationError {
     InvalidHouseCount(usize),
     #[error("{field} must not be empty")]
     EmptyText { field: &'static str },
+    #[error("aspect orb must be finite and in 0..=180 degrees, got {0}")]
+    InvalidAspectOrb(String),
+    #[error("aspect definitions must not contain duplicates: {0:?}")]
+    DuplicateAspect(crate::AspectKind),
 }
 
 /// A complete calculation failed; partial results are never successful.

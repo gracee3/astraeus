@@ -38,6 +38,9 @@ data revision.
 [calculation artifact format](docs/ARTIFACTS.md) for safe hand-off to storage,
 APIs, and future composition applications.
 
+The core also provides deterministic [aspect detection](docs/ASPECTS.md) over
+validated positions, with explicit per-aspect orbs and canonical pair ordering.
+
 ## License
 
 AGPL-3.0-or-later. Swiss Ephemeris has its own dual-license requirements; its
