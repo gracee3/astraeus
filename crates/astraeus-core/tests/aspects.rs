@@ -1,16 +1,16 @@
 use std::collections::BTreeMap;
 
 use astraeus_core::{
-    ASPECT_EXACT_TOLERANCE_DEGREES, Aspect, AspectDefinition, AspectDefinitions, AspectKind,
-    AspectPhase, CelestialObject, Position, ValidationError, calculate_aspects,
+    ASPECT_EXACT_TOLERANCE_DEGREES, AngularPosition, Aspect, AspectDefinition, AspectDefinitions,
+    AspectKind, AspectPhase, ChartPointId, ValidationError, calculate_aspects,
 };
 
-fn position(longitude: f64) -> Position {
+fn position(longitude: f64) -> AngularPosition {
     position_with_speed(longitude, 0.0)
 }
 
-fn position_with_speed(longitude: f64, speed: f64) -> Position {
-    Position::new(longitude, 0.0, 1.0, speed).unwrap()
+fn position_with_speed(longitude: f64, speed: f64) -> AngularPosition {
+    AngularPosition::new(longitude, speed).unwrap()
 }
 
 #[test]
@@ -23,8 +23,8 @@ fn detects_every_ptolemaic_aspect_at_exactitude() {
         (AspectKind::Opposition, 180.0),
     ] {
         let positions = BTreeMap::from([
-            (CelestialObject::Sun, position(0.0)),
-            (CelestialObject::Moon, position(longitude)),
+            (ChartPointId::Sun, position(0.0)),
+            (ChartPointId::Moon, position(longitude)),
         ]);
         let definitions =
             AspectDefinitions::new(vec![AspectDefinition::new(kind, 0.0).unwrap()]).unwrap();
@@ -50,8 +50,8 @@ fn phase_tracks_motion_on_both_sides_of_an_aspect() {
         (269.0, -1.0, AspectPhase::Separating),
     ] {
         let positions = BTreeMap::from([
-            (CelestialObject::Sun, position(0.0)),
-            (CelestialObject::Moon, position_with_speed(longitude, speed)),
+            (ChartPointId::Sun, position(0.0)),
+            (ChartPointId::Moon, position_with_speed(longitude, speed)),
         ]);
         assert_eq!(
             calculate_aspects(&positions, &definitions)[0].phase(),
@@ -71,8 +71,8 @@ fn conjunction_and_opposition_wraparound_preserve_phase() {
         let definitions =
             AspectDefinitions::new(vec![AspectDefinition::new(kind, 2.0).unwrap()]).unwrap();
         let positions = BTreeMap::from([
-            (CelestialObject::Sun, position(first)),
-            (CelestialObject::Moon, position_with_speed(second, speed)),
+            (ChartPointId::Sun, position(first)),
+            (ChartPointId::Moon, position_with_speed(second, speed)),
         ]);
         assert_eq!(
             calculate_aspects(&positions, &definitions)[0].phase(),
@@ -95,8 +95,8 @@ fn exactitude_precedes_stationary_classification() {
         ),
     ] {
         let positions = BTreeMap::from([
-            (CelestialObject::Sun, position_with_speed(0.0, 1.0)),
-            (CelestialObject::Moon, position_with_speed(longitude, 1.0)),
+            (ChartPointId::Sun, position_with_speed(0.0, 1.0)),
+            (ChartPointId::Moon, position_with_speed(longitude, 1.0)),
         ]);
         assert_eq!(
             calculate_aspects(&positions, &definitions)[0].phase(),
@@ -108,9 +108,9 @@ fn exactitude_precedes_stationary_classification() {
 #[test]
 fn detects_wraparound_and_inclusive_orbs() {
     let positions = BTreeMap::from([
-        (CelestialObject::Sun, position(358.0)),
-        (CelestialObject::Moon, position(2.0)),
-        (CelestialObject::Mars, position(92.0)),
+        (ChartPointId::Sun, position(358.0)),
+        (ChartPointId::Moon, position(2.0)),
+        (ChartPointId::Mars, position(92.0)),
     ]);
     let definitions = AspectDefinitions::new(vec![
         AspectDefinition::new(AspectKind::Conjunction, 4.0).unwrap(),
@@ -130,8 +130,8 @@ fn detects_wraparound_and_inclusive_orbs() {
 #[test]
 fn closest_aspect_wins_when_windows_overlap() {
     let positions = BTreeMap::from([
-        (CelestialObject::Sun, position(0.0)),
-        (CelestialObject::Moon, position(80.0)),
+        (ChartPointId::Sun, position(0.0)),
+        (ChartPointId::Moon, position(80.0)),
     ]);
     let definitions = AspectDefinitions::new(vec![
         AspectDefinition::new(AspectKind::Sextile, 25.0).unwrap(),
@@ -147,8 +147,8 @@ fn closest_aspect_wins_when_windows_overlap() {
 #[test]
 fn definition_order_does_not_change_tie_breaking() {
     let positions = BTreeMap::from([
-        (CelestialObject::Sun, position(0.0)),
-        (CelestialObject::Moon, position(75.0)),
+        (ChartPointId::Sun, position(0.0)),
+        (ChartPointId::Moon, position(75.0)),
     ]);
     for kinds in [
         [AspectKind::Sextile, AspectKind::Square],
@@ -175,15 +175,15 @@ fn no_match_is_empty_and_multiple_pairs_are_canonically_ordered() {
     ])
     .unwrap();
     let no_match = BTreeMap::from([
-        (CelestialObject::Sun, position(0.0)),
-        (CelestialObject::Moon, position(10.0)),
+        (ChartPointId::Sun, position(0.0)),
+        (ChartPointId::Moon, position(10.0)),
     ]);
     assert!(calculate_aspects(&no_match, &definitions).is_empty());
 
     let positions = BTreeMap::from([
-        (CelestialObject::Mars, position(0.0)),
-        (CelestialObject::Sun, position(0.0)),
-        (CelestialObject::Moon, position(0.0)),
+        (ChartPointId::Mars, position(0.0)),
+        (ChartPointId::Sun, position(0.0)),
+        (ChartPointId::Moon, position(0.0)),
     ]);
     let aspects = calculate_aspects(&positions, &definitions);
     assert_eq!(aspects.len(), 3);
@@ -193,9 +193,9 @@ fn no_match_is_empty_and_multiple_pairs_are_canonically_ordered() {
             .map(|aspect| (aspect.first(), aspect.second()))
             .collect::<Vec<_>>(),
         vec![
-            (CelestialObject::Sun, CelestialObject::Moon),
-            (CelestialObject::Sun, CelestialObject::Mars),
-            (CelestialObject::Moon, CelestialObject::Mars),
+            (ChartPointId::Sun, ChartPointId::Moon),
+            (ChartPointId::Sun, ChartPointId::Mars),
+            (ChartPointId::Moon, ChartPointId::Mars),
         ]
     );
 }
@@ -240,8 +240,8 @@ fn json_cannot_bypass_definition_validation() {
     ])
     .unwrap();
     let positions = BTreeMap::from([
-        (CelestialObject::Sun, position(0.0)),
-        (CelestialObject::Moon, position_with_speed(89.0, 1.0)),
+        (ChartPointId::Sun, position(0.0)),
+        (ChartPointId::Moon, position_with_speed(89.0, 1.0)),
     ]);
     let aspect = calculate_aspects(&positions, &definitions)[0];
     let json = serde_json::to_string(&aspect).unwrap();

@@ -27,6 +27,11 @@ Aspect results now include validated instantaneous motion phase with explicit
 exactitude and relative-station thresholds and defined conjunction/opposition
 boundary behavior.
 
+Derived chart artifacts now combine an unchanged calculation artifact with a
+matching chart specification and recomputed aspects under a separate schema.
+Automatic GitHub CI is paused by user direction; local locked workspace tests
+remain required, and the tracked CI workflow is manual-dispatch only.
+
 ## Recommendation
 
 Run four independent tracks:

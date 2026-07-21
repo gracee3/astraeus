@@ -38,8 +38,13 @@
     },
     "houses": {
       "cusps_degrees": [135.4866406, 162.1221190, 189.0410085, 215.7843883, 257.9149985, 288.5004122, 315.4866406, 342.1221190, 9.0410085, 35.7843883, 77.9149985, 108.5004122],
-      "ascendant_degrees": 135.4866406,
-      "midheaven_degrees": 35.7843883
+      "angles": {
+        "ascendant": {"longitude_degrees": 135.4866406, "longitude_speed_degrees_per_day": 282.1351833},
+        "midheaven": {"longitude_degrees": 35.7843883, "longitude_speed_degrees_per_day": 372.1659729},
+        "descendant": {"longitude_degrees": 315.4866406, "longitude_speed_degrees_per_day": 282.1351833},
+        "imum_coeli": {"longitude_degrees": 215.7843883, "longitude_speed_degrees_per_day": 372.1659729},
+        "vertex": {"longitude_degrees": 273.0101104, "longitude_speed_degrees_per_day": 342.8050107}
+      }
     }
   },
   "tolerances": {"angle_degrees": 0.000001, "distance_au": 0.000000001, "speed_degrees_per_day": 0.000001}

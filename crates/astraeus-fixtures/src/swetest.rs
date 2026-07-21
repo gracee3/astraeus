@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use astraeus_core::{
-    CalculationError, CalculationProvenance, CalculationRequest, CalculationResult,
-    CelestialObject, EphemerisSource, HouseCusps, Position,
+    AngularPosition, CalculationError, CalculationProvenance, CalculationRequest,
+    CalculationResult, CelestialObject, ChartAngles, EphemerisSource, HouseCusps, Position,
 };
 use chrono::{Datelike, Timelike};
 use thiserror::Error;
@@ -37,6 +37,8 @@ pub enum SwetestParseError {
     MissingAscendant,
     #[error("missing MC row")]
     MissingMidheaven,
+    #[error("missing Vertex row")]
+    MissingVertex,
     #[error(transparent)]
     InvalidValue(#[from] astraeus_core::ValidationError),
     #[error(transparent)]
@@ -51,6 +53,7 @@ pub fn parse_swetest_output(
     let mut cusps: [Option<f64>; 12] = [None; 12];
     let mut ascendant = None;
     let mut midheaven = None;
+    let mut vertex = None;
     let instant = request.instant().as_datetime();
     let expected_timestamp = format!(
         "{:02}.{:02}.{} {:02}:{:02}:{:02} UT",
@@ -116,9 +119,12 @@ pub fn parse_swetest_output(
                 });
             }
         } else if name == "Ascendant" {
-            require_fields(line, &fields, 3)?;
+            require_fields(line, &fields, 4)?;
             if ascendant
-                .replace(number(line, "ascendant", fields[2])?)
+                .replace(AngularPosition::new(
+                    number(line, "ascendant", fields[2])?,
+                    number(line, "ascendant speed", fields[3])?,
+                )?)
                 .is_some()
             {
                 return Err(SwetestParseError::DuplicateRow {
@@ -127,9 +133,26 @@ pub fn parse_swetest_output(
                 });
             }
         } else if name == "MC" {
-            require_fields(line, &fields, 3)?;
+            require_fields(line, &fields, 4)?;
             if midheaven
-                .replace(number(line, "midheaven", fields[2])?)
+                .replace(AngularPosition::new(
+                    number(line, "midheaven", fields[2])?,
+                    number(line, "midheaven speed", fields[3])?,
+                )?)
+                .is_some()
+            {
+                return Err(SwetestParseError::DuplicateRow {
+                    line,
+                    row: name.into(),
+                });
+            }
+        } else if name == "Vertex" {
+            require_fields(line, &fields, 4)?;
+            if vertex
+                .replace(AngularPosition::new(
+                    number(line, "vertex", fields[2])?,
+                    number(line, "vertex speed", fields[3])?,
+                )?)
                 .is_some()
             {
                 return Err(SwetestParseError::DuplicateRow {
@@ -139,7 +162,7 @@ pub fn parse_swetest_output(
             }
         } else if !matches!(
             name,
-            "ARMC" | "Vertex" | "equat. Asc." | "co-Asc. W.Koch" | "co-Asc Munkasey" | "Polar Asc."
+            "ARMC" | "equat. Asc." | "co-Asc. W.Koch" | "co-Asc Munkasey" | "Polar Asc."
         ) {
             return Err(SwetestParseError::UnsupportedRow {
                 line,
@@ -155,8 +178,11 @@ pub fn parse_swetest_output(
         .collect::<Result<Vec<_>, _>>()?;
     let houses = HouseCusps::new(
         cusps,
-        ascendant.ok_or(SwetestParseError::MissingAscendant)?,
-        midheaven.ok_or(SwetestParseError::MissingMidheaven)?,
+        ChartAngles::new(
+            ascendant.ok_or(SwetestParseError::MissingAscendant)?,
+            midheaven.ok_or(SwetestParseError::MissingMidheaven)?,
+            vertex.ok_or(SwetestParseError::MissingVertex)?,
+        )?,
     )?;
     let provenance =
         CalculationProvenance::new("swetest", "unknown", EphemerisSource::Synthetic, None)?;

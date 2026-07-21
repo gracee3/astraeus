@@ -1,8 +1,12 @@
 use std::{error::Error, fmt};
 
-use astraeus_core::{CalculationResult, CelestialObject};
+use astraeus_core::{CalculationResult, CelestialObject, ChartAngle};
 
 use crate::FixtureTolerances;
+
+// Chart-angle speeds are computed by the adapter with a documented symmetric
+// 30-second sample rather than Swiss Ephemeris's internal derivative routine.
+const ANGLE_SPEED_TOLERANCE_DEGREES_PER_DAY: f64 = 0.005;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum FixtureMismatch {
@@ -115,6 +119,44 @@ pub(crate) fn compare_results(
         tolerances.angle_degrees,
         &mut mismatches,
     );
+    compare_angular(
+        "houses.angles.vertex.longitude_degrees".into(),
+        expected
+            .houses()
+            .angles()
+            .get(ChartAngle::Vertex)
+            .longitude_degrees(),
+        actual
+            .houses()
+            .angles()
+            .get(ChartAngle::Vertex)
+            .longitude_degrees(),
+        tolerances.angle_degrees,
+        &mut mismatches,
+    );
+    for angle in [
+        ChartAngle::Ascendant,
+        ChartAngle::Midheaven,
+        ChartAngle::Descendant,
+        ChartAngle::ImumCoeli,
+        ChartAngle::Vertex,
+    ] {
+        compare_linear(
+            format!("houses.angles.{angle:?}.longitude_speed_degrees_per_day"),
+            expected
+                .houses()
+                .angles()
+                .get(angle)
+                .longitude_speed_degrees_per_day(),
+            actual
+                .houses()
+                .angles()
+                .get(angle)
+                .longitude_speed_degrees_per_day(),
+            ANGLE_SPEED_TOLERANCE_DEGREES_PER_DAY,
+            &mut mismatches,
+        );
+    }
 
     if mismatches.is_empty() {
         Ok(())
