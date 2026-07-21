@@ -82,3 +82,5 @@ a self-hosted runner labeled `astraeus-swiss`. The protected
 `swiss-ephemeris-verification` environment must define the
 `ASTRAEUS_SWISS_EPHEMERIS_PATH` variable, pointing to runner-local pinned data.
 Ordinary hosted CI never receives or caches the licensed ephemeris files.
+Use the [ephemeral runner procedure](EPHEMERAL_RUNNER.md) for each selected
+verification run; no self-hosted runner should remain registered afterward.

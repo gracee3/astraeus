@@ -349,20 +349,17 @@ impl<'de> Deserialize<'de> for HouseCusps {
     }
 }
 
+/// Reusable validated choices that determine a calculation's domain behavior.
 #[derive(Clone, Debug, PartialEq, Serialize)]
-pub struct CalculationRequest {
-    instant: UtcInstant,
-    location: GeographicLocation,
+pub struct CalculationOptions {
     objects: Vec<CelestialObject>,
     zodiac: Zodiac,
     ayanamsa: Option<Ayanamsa>,
     house_system: HouseSystem,
 }
 
-impl CalculationRequest {
+impl CalculationOptions {
     pub fn new(
-        instant: UtcInstant,
-        location: GeographicLocation,
         objects: Vec<CelestialObject>,
         zodiac: Zodiac,
         ayanamsa: Option<Ayanamsa>,
@@ -383,13 +380,86 @@ impl CalculationRequest {
             _ => {}
         }
         Ok(Self {
-            instant,
-            location,
             objects,
             zodiac,
             ayanamsa,
             house_system,
         })
+    }
+
+    pub fn objects(&self) -> &[CelestialObject] {
+        &self.objects
+    }
+    pub fn zodiac(&self) -> Zodiac {
+        self.zodiac
+    }
+    pub fn ayanamsa(&self) -> Option<Ayanamsa> {
+        self.ayanamsa
+    }
+    pub fn house_system(&self) -> HouseSystem {
+        self.house_system
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CalculationOptionsWire {
+    objects: Vec<CelestialObject>,
+    zodiac: Zodiac,
+    ayanamsa: Option<Ayanamsa>,
+    house_system: HouseSystem,
+}
+
+impl<'de> Deserialize<'de> for CalculationOptions {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = CalculationOptionsWire::deserialize(deserializer)?;
+        Self::new(wire.objects, wire.zodiac, wire.ayanamsa, wire.house_system)
+            .map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct CalculationRequest {
+    instant: UtcInstant,
+    location: GeographicLocation,
+    objects: Vec<CelestialObject>,
+    zodiac: Zodiac,
+    ayanamsa: Option<Ayanamsa>,
+    house_system: HouseSystem,
+}
+
+impl CalculationRequest {
+    pub fn new(
+        instant: UtcInstant,
+        location: GeographicLocation,
+        objects: Vec<CelestialObject>,
+        zodiac: Zodiac,
+        ayanamsa: Option<Ayanamsa>,
+        house_system: HouseSystem,
+    ) -> Result<Self, ValidationError> {
+        Ok(Self::from_options(
+            instant,
+            location,
+            CalculationOptions::new(objects, zodiac, ayanamsa, house_system)?,
+        ))
+    }
+
+    pub fn from_options(
+        instant: UtcInstant,
+        location: GeographicLocation,
+        options: CalculationOptions,
+    ) -> Self {
+        Self {
+            instant,
+            location,
+            objects: options.objects,
+            zodiac: options.zodiac,
+            ayanamsa: options.ayanamsa,
+            house_system: options.house_system,
+        }
     }
 
     pub fn instant(&self) -> UtcInstant {
@@ -410,9 +480,18 @@ impl CalculationRequest {
     pub fn house_system(&self) -> HouseSystem {
         self.house_system
     }
+    pub fn options(&self) -> CalculationOptions {
+        CalculationOptions {
+            objects: self.objects.clone(),
+            zodiac: self.zodiac,
+            ayanamsa: self.ayanamsa,
+            house_system: self.house_system,
+        }
+    }
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct CalculationRequestWire {
     instant: UtcInstant,
     location: GeographicLocation,
