@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::ValidationError;
 
@@ -55,7 +55,7 @@ pub enum HouseSystem {
 }
 
 /// A timestamp normalized to UTC on construction.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(transparent)]
 pub struct UtcInstant(DateTime<Utc>);
 
@@ -71,7 +71,17 @@ impl UtcInstant {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+impl<'de> Deserialize<'de> for UtcInstant {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Self::parse_rfc3339(&value).map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct GeographicLocation {
     latitude_degrees: f64,
     longitude_degrees: f64,
@@ -105,7 +115,29 @@ impl GeographicLocation {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Deserialize)]
+struct GeographicLocationWire {
+    latitude_degrees: f64,
+    longitude_degrees: f64,
+    elevation_meters: f64,
+}
+
+impl<'de> Deserialize<'de> for GeographicLocation {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = GeographicLocationWire::deserialize(deserializer)?;
+        Self::new(
+            wire.latitude_degrees,
+            wire.longitude_degrees,
+            wire.elevation_meters,
+        )
+        .map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct Position {
     longitude_degrees: f64,
     latitude_degrees: f64,
@@ -155,7 +187,31 @@ impl Position {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Deserialize)]
+struct PositionWire {
+    longitude_degrees: f64,
+    latitude_degrees: f64,
+    distance_au: f64,
+    longitude_speed_degrees_per_day: f64,
+}
+
+impl<'de> Deserialize<'de> for Position {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = PositionWire::deserialize(deserializer)?;
+        Self::new(
+            wire.longitude_degrees,
+            wire.latitude_degrees,
+            wire.distance_au,
+            wire.longitude_speed_degrees_per_day,
+        )
+        .map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct HouseCusps {
     cusps_degrees: [f64; 12],
     ascendant_degrees: f64,
@@ -195,7 +251,29 @@ impl HouseCusps {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Deserialize)]
+struct HouseCuspsWire {
+    cusps_degrees: Vec<f64>,
+    ascendant_degrees: f64,
+    midheaven_degrees: f64,
+}
+
+impl<'de> Deserialize<'de> for HouseCusps {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = HouseCuspsWire::deserialize(deserializer)?;
+        Self::new(
+            wire.cusps_degrees,
+            wire.ascendant_degrees,
+            wire.midheaven_degrees,
+        )
+        .map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct CalculationRequest {
     instant: UtcInstant,
     location: GeographicLocation,
@@ -258,7 +336,35 @@ impl CalculationRequest {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Deserialize)]
+struct CalculationRequestWire {
+    instant: UtcInstant,
+    location: GeographicLocation,
+    objects: Vec<CelestialObject>,
+    zodiac: Zodiac,
+    ayanamsa: Option<Ayanamsa>,
+    house_system: HouseSystem,
+}
+
+impl<'de> Deserialize<'de> for CalculationRequest {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = CalculationRequestWire::deserialize(deserializer)?;
+        Self::new(
+            wire.instant,
+            wire.location,
+            wire.objects,
+            wire.zodiac,
+            wire.ayanamsa,
+            wire.house_system,
+        )
+        .map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct CalculationResult {
     positions: std::collections::BTreeMap<CelestialObject, Position>,
     houses: HouseCusps,

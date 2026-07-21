@@ -21,6 +21,11 @@ Start with [the project organization and Track B handoff](docs/PROJECT_ORGANIZAT
 It records the repository boundaries, legacy sources, known defects, first
 checkpoint, and non-goals.
 
+The calculation contract lives in `astraeus-core`. The non-published
+`astraeus-fixtures` crate verifies versioned external reference output without
+adding a native ephemeris dependency. See [validation fixtures](docs/VALIDATION.md)
+and the [Swiss Ephemeris integration policy](docs/SWISS_EPHEMERIS.md).
+
 ## License
 
 AGPL-3.0-or-later. Swiss Ephemeris has its own dual-license requirements; its

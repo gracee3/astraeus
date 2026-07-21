@@ -174,3 +174,58 @@ fn result_rejects_unrequested_provider_output() {
         CalculationError::UnexpectedObject(CelestialObject::Moon)
     );
 }
+
+#[test]
+fn deserialization_preserves_domain_validation() {
+    let invalid_location = r#"{
+        "latitude_degrees": 91.0,
+        "longitude_degrees": 0.0,
+        "elevation_meters": 0.0
+    }"#;
+    assert!(serde_json::from_str::<GeographicLocation>(invalid_location).is_err());
+
+    let invalid_position = r#"{
+        "longitude_degrees": 360.0,
+        "latitude_degrees": 0.0,
+        "distance_au": 1.0,
+        "longitude_speed_degrees_per_day": 1.0
+    }"#;
+    assert!(serde_json::from_str::<Position>(invalid_position).is_err());
+
+    let invalid_houses = r#"{
+        "cusps_degrees": [0.0, 30.0],
+        "ascendant_degrees": 0.0,
+        "midheaven_degrees": 270.0
+    }"#;
+    assert!(serde_json::from_str::<HouseCusps>(invalid_houses).is_err());
+}
+
+#[test]
+fn request_json_cannot_bypass_cross_field_rules() {
+    let request = r#"{
+        "instant": "2000-01-01T12:00:00Z",
+        "location": {
+            "latitude_degrees": 0.0,
+            "longitude_degrees": 0.0,
+            "elevation_meters": 0.0
+        },
+        "objects": ["sun", "sun"],
+        "zodiac": "sidereal",
+        "ayanamsa": null,
+        "house_system": "placidus"
+    }"#;
+    assert!(serde_json::from_str::<CalculationRequest>(request).is_err());
+}
+
+#[test]
+fn utc_json_round_trip_normalizes_offsets() {
+    let instant: UtcInstant = serde_json::from_str(r#""2000-01-01T07:00:00-05:00""#).unwrap();
+    assert_eq!(
+        instant,
+        UtcInstant::parse_rfc3339("2000-01-01T12:00:00Z").unwrap()
+    );
+    assert_eq!(
+        serde_json::to_string(&instant).unwrap(),
+        r#""2000-01-01T12:00:00Z""#
+    );
+}
