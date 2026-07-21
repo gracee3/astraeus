@@ -1,0 +1,332 @@
+use std::collections::BTreeSet;
+
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+
+use crate::ValidationError;
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CelestialObject {
+    Sun,
+    Moon,
+    Mercury,
+    Venus,
+    Mars,
+    Jupiter,
+    Saturn,
+    Uranus,
+    Neptune,
+    Pluto,
+    MeanNode,
+    TrueNode,
+    Chiron,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Zodiac {
+    Tropical,
+    Sidereal,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Ayanamsa {
+    FaganBradley,
+    Lahiri,
+    DeLuce,
+    Raman,
+    Krishnamurti,
+    Yukteshwar,
+    JnBhasin,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HouseSystem {
+    Placidus,
+    Koch,
+    Porphyry,
+    Regiomontanus,
+    Campanus,
+    Equal,
+    WholeSign,
+}
+
+/// A timestamp normalized to UTC on construction.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct UtcInstant(DateTime<Utc>);
+
+impl UtcInstant {
+    pub fn parse_rfc3339(value: &str) -> Result<Self, ValidationError> {
+        DateTime::parse_from_rfc3339(value)
+            .map(|instant| Self(instant.with_timezone(&Utc)))
+            .map_err(|_| ValidationError::InvalidUtcInstant(value.to_owned()))
+    }
+
+    pub fn as_datetime(&self) -> DateTime<Utc> {
+        self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GeographicLocation {
+    latitude_degrees: f64,
+    longitude_degrees: f64,
+    elevation_meters: f64,
+}
+
+impl GeographicLocation {
+    pub fn new(
+        latitude_degrees: f64,
+        longitude_degrees: f64,
+        elevation_meters: f64,
+    ) -> Result<Self, ValidationError> {
+        validate_range("latitude_degrees", latitude_degrees, -90, 90)?;
+        validate_range("longitude_degrees", longitude_degrees, -180, 180)?;
+        validate_range("elevation_meters", elevation_meters, -500, 10_000)?;
+        Ok(Self {
+            latitude_degrees,
+            longitude_degrees,
+            elevation_meters,
+        })
+    }
+
+    pub fn latitude_degrees(&self) -> f64 {
+        self.latitude_degrees
+    }
+    pub fn longitude_degrees(&self) -> f64 {
+        self.longitude_degrees
+    }
+    pub fn elevation_meters(&self) -> f64 {
+        self.elevation_meters
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Position {
+    longitude_degrees: f64,
+    latitude_degrees: f64,
+    distance_au: f64,
+    longitude_speed_degrees_per_day: f64,
+}
+
+impl Position {
+    pub fn new(
+        longitude_degrees: f64,
+        latitude_degrees: f64,
+        distance_au: f64,
+        longitude_speed_degrees_per_day: f64,
+    ) -> Result<Self, ValidationError> {
+        validate_range("longitude_degrees", longitude_degrees, 0, 360)?;
+        if longitude_degrees == 360.0 {
+            return Err(out_of_range("longitude_degrees", 0, 359, longitude_degrees));
+        }
+        validate_range("latitude_degrees", latitude_degrees, -90, 90)?;
+        validate_range("distance_au", distance_au, 0, i32::MAX)?;
+        validate_finite(
+            "longitude_speed_degrees_per_day",
+            longitude_speed_degrees_per_day,
+        )?;
+        Ok(Self {
+            longitude_degrees,
+            latitude_degrees,
+            distance_au,
+            longitude_speed_degrees_per_day,
+        })
+    }
+
+    pub fn longitude_degrees(&self) -> f64 {
+        self.longitude_degrees
+    }
+    pub fn latitude_degrees(&self) -> f64 {
+        self.latitude_degrees
+    }
+    pub fn distance_au(&self) -> f64 {
+        self.distance_au
+    }
+    pub fn longitude_speed_degrees_per_day(&self) -> f64 {
+        self.longitude_speed_degrees_per_day
+    }
+    pub fn is_retrograde(&self) -> bool {
+        self.longitude_speed_degrees_per_day < 0.0
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct HouseCusps {
+    cusps_degrees: [f64; 12],
+    ascendant_degrees: f64,
+    midheaven_degrees: f64,
+}
+
+impl HouseCusps {
+    pub fn new(
+        cusps_degrees: Vec<f64>,
+        ascendant_degrees: f64,
+        midheaven_degrees: f64,
+    ) -> Result<Self, ValidationError> {
+        let count = cusps_degrees.len();
+        let cusps_degrees: [f64; 12] = cusps_degrees
+            .try_into()
+            .map_err(|_| ValidationError::InvalidHouseCount(count))?;
+        for value in cusps_degrees {
+            validate_longitude(value)?;
+        }
+        validate_longitude(ascendant_degrees)?;
+        validate_longitude(midheaven_degrees)?;
+        Ok(Self {
+            cusps_degrees,
+            ascendant_degrees,
+            midheaven_degrees,
+        })
+    }
+
+    pub fn cusps_degrees(&self) -> &[f64; 12] {
+        &self.cusps_degrees
+    }
+    pub fn ascendant_degrees(&self) -> f64 {
+        self.ascendant_degrees
+    }
+    pub fn midheaven_degrees(&self) -> f64 {
+        self.midheaven_degrees
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CalculationRequest {
+    instant: UtcInstant,
+    location: GeographicLocation,
+    objects: Vec<CelestialObject>,
+    zodiac: Zodiac,
+    ayanamsa: Option<Ayanamsa>,
+    house_system: HouseSystem,
+}
+
+impl CalculationRequest {
+    pub fn new(
+        instant: UtcInstant,
+        location: GeographicLocation,
+        objects: Vec<CelestialObject>,
+        zodiac: Zodiac,
+        ayanamsa: Option<Ayanamsa>,
+        house_system: HouseSystem,
+    ) -> Result<Self, ValidationError> {
+        if objects.is_empty() {
+            return Err(ValidationError::EmptyObjectSet);
+        }
+        let mut seen = BTreeSet::new();
+        for object in &objects {
+            if !seen.insert(*object) {
+                return Err(ValidationError::DuplicateObject(*object));
+            }
+        }
+        match (zodiac, ayanamsa) {
+            (Zodiac::Sidereal, None) => return Err(ValidationError::MissingAyanamsa),
+            (Zodiac::Tropical, Some(_)) => return Err(ValidationError::UnexpectedAyanamsa),
+            _ => {}
+        }
+        Ok(Self {
+            instant,
+            location,
+            objects,
+            zodiac,
+            ayanamsa,
+            house_system,
+        })
+    }
+
+    pub fn instant(&self) -> UtcInstant {
+        self.instant
+    }
+    pub fn location(&self) -> GeographicLocation {
+        self.location
+    }
+    pub fn objects(&self) -> &[CelestialObject] {
+        &self.objects
+    }
+    pub fn zodiac(&self) -> Zodiac {
+        self.zodiac
+    }
+    pub fn ayanamsa(&self) -> Option<Ayanamsa> {
+        self.ayanamsa
+    }
+    pub fn house_system(&self) -> HouseSystem {
+        self.house_system
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CalculationResult {
+    positions: std::collections::BTreeMap<CelestialObject, Position>,
+    houses: HouseCusps,
+}
+
+impl CalculationResult {
+    pub fn new(
+        request: &CalculationRequest,
+        positions: std::collections::BTreeMap<CelestialObject, Position>,
+        houses: HouseCusps,
+    ) -> Result<Self, crate::CalculationError> {
+        for object in request.objects() {
+            if !positions.contains_key(object) {
+                return Err(crate::CalculationError::MissingObject(*object));
+            }
+        }
+        for object in positions.keys() {
+            if !request.objects().contains(object) {
+                return Err(crate::CalculationError::UnexpectedObject(*object));
+            }
+        }
+        Ok(Self { positions, houses })
+    }
+
+    pub fn positions(&self) -> &std::collections::BTreeMap<CelestialObject, Position> {
+        &self.positions
+    }
+
+    pub fn houses(&self) -> &HouseCusps {
+        &self.houses
+    }
+}
+
+fn validate_longitude(value: f64) -> Result<(), ValidationError> {
+    validate_range("longitude_degrees", value, 0, 360)?;
+    if value == 360.0 {
+        return Err(out_of_range("longitude_degrees", 0, 359, value));
+    }
+    Ok(())
+}
+
+fn validate_finite(field: &'static str, value: f64) -> Result<(), ValidationError> {
+    if value.is_finite() {
+        Ok(())
+    } else {
+        Err(ValidationError::NonFinite { field })
+    }
+}
+
+fn validate_range(
+    field: &'static str,
+    value: f64,
+    minimum: i32,
+    maximum: i32,
+) -> Result<(), ValidationError> {
+    validate_finite(field, value)?;
+    if value < f64::from(minimum) || value > f64::from(maximum) {
+        Err(out_of_range(field, minimum, maximum, value))
+    } else {
+        Ok(())
+    }
+}
+
+fn out_of_range(field: &'static str, minimum: i32, maximum: i32, value: f64) -> ValidationError {
+    ValidationError::OutOfRange {
+        field,
+        minimum,
+        maximum,
+        value: value.to_string(),
+    }
+}
