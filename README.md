@@ -34,6 +34,10 @@ Every successful result includes validated [calculation provenance](docs/PROVENA
 covering its provider, runtime version, ephemeris source, and optional pinned
 data revision.
 
+`astraeus-artifacts` provides the versioned, content-addressed
+[calculation artifact format](docs/ARTIFACTS.md) for safe hand-off to storage,
+APIs, and future composition applications.
+
 ## License
 
 AGPL-3.0-or-later. Swiss Ephemeris has its own dual-license requirements; its

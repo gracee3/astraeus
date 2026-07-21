@@ -3,6 +3,17 @@
 version = 4
 
 [[package]]
+name = "astraeus-artifacts"
+version = "0.1.0"
+dependencies = [
+ "astraeus-core",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+]
+
+[[package]]
 name = "astraeus-core"
 version = "0.1.0"
 dependencies = [
