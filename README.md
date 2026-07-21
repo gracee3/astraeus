@@ -54,6 +54,10 @@ South Nodes, sign/house placements, and revalidated aspects.
 [Western policy artifacts](docs/WESTERN_POLICIES.md) for traditional/modern
 rulership, essential dignity, and selectable Chaldean/triplicity decans.
 
+`astraeus-comparison` provides content-addressed
+[two-chart comparisons](docs/COMPARISONS.md) with explicit layer identities and
+motion semantics for synastry, transits, progressions, returns, and research.
+
 ## License
 
 AGPL-3.0-or-later. Swiss Ephemeris has its own dual-license requirements; its

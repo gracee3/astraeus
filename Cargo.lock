@@ -14,6 +14,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "astraeus-comparison"
+version = "0.1.0"
+dependencies = [
+ "astraeus-artifacts",
+ "astraeus-core",
+ "astraeus-derived",
+ "astraeus-specifications",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+]
+
+[[package]]
 name = "astraeus-core"
 version = "0.1.0"
 dependencies = [
