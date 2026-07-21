@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
 
-use astraeus_core::{CalculationRequest, CalculationResult, CelestialObject, HouseCusps, Position};
+use astraeus_core::{
+    CalculationProvenance, CalculationRequest, CalculationResult, CelestialObject, EphemerisSource,
+    HouseCusps, Position,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -86,8 +89,24 @@ impl GoldenFixture {
         validate_nonempty("id", &wire.id)?;
         wire.source.validate()?;
         wire.tolerances.validate()?;
-        let expected =
-            CalculationResult::new(&wire.request, wire.expected.positions, wire.expected.houses)?;
+        let ephemeris_source = match wire.source.engine.as_str() {
+            "moshier" => EphemerisSource::Moshier,
+            "swiss_files" => EphemerisSource::SwissFiles,
+            _ => EphemerisSource::Synthetic,
+        };
+        let provenance = CalculationProvenance::new(
+            wire.source.tool.clone(),
+            wire.source.version.clone(),
+            ephemeris_source,
+            Some(wire.source.revision.clone()),
+        )
+        .map_err(astraeus_core::CalculationError::from)?;
+        let expected = CalculationResult::new(
+            &wire.request,
+            wire.expected.positions,
+            wire.expected.houses,
+            provenance,
+        )?;
         Ok(Self {
             id: wire.id,
             source: wire.source,

@@ -9,8 +9,8 @@ use std::{
 };
 
 use astraeus_core::{
-    Ayanamsa, CalculationError, CalculationRequest, CalculationResult, CelestialObject,
-    EphemerisAdapter, HouseCusps, HouseSystem, Position, Zodiac,
+    Ayanamsa, CalculationError, CalculationProvenance, CalculationRequest, CalculationResult,
+    CelestialObject, EphemerisAdapter, EphemerisSource, HouseCusps, HouseSystem, Position, Zodiac,
 };
 use chrono::{Datelike, Timelike};
 use sweph_sys as sys;
@@ -26,12 +26,14 @@ pub enum EphemerisMode {
 #[derive(Clone, Debug)]
 pub struct SwissEphemerisAdapter {
     mode: EphemerisMode,
+    data_revision: Option<String>,
 }
 
 impl SwissEphemerisAdapter {
     pub fn moshier() -> Self {
         Self {
             mode: EphemerisMode::Moshier,
+            data_revision: None,
         }
     }
 
@@ -46,7 +48,24 @@ impl SwissEphemerisAdapter {
         path_to_c_string(path)?;
         Ok(Self {
             mode: EphemerisMode::SwissFiles(path.to_owned()),
+            data_revision: None,
         })
+    }
+
+    pub fn swiss_files_with_revision(
+        path: impl AsRef<Path>,
+        data_revision: impl Into<String>,
+    ) -> Result<Self, CalculationError> {
+        let mut adapter = Self::swiss_files(path)?;
+        let revision = data_revision.into();
+        CalculationProvenance::new(
+            "Swiss Ephemeris",
+            "2.10.03",
+            EphemerisSource::SwissFiles,
+            Some(revision.clone()),
+        )?;
+        adapter.data_revision = Some(revision);
+        Ok(adapter)
     }
 
     pub fn mode(&self) -> &EphemerisMode {
@@ -149,7 +168,17 @@ impl SwissEphemerisAdapter {
             )));
         }
         let houses = HouseCusps::new(cusps[1..13].to_vec(), angles[0], angles[1])?;
-        CalculationResult::new(request, positions, houses)
+        let source = match self.mode {
+            EphemerisMode::Moshier => EphemerisSource::Moshier,
+            EphemerisMode::SwissFiles(_) => EphemerisSource::SwissFiles,
+        };
+        let provenance = CalculationProvenance::new(
+            "Swiss Ephemeris",
+            native_version(),
+            source,
+            self.data_revision.clone(),
+        )?;
+        CalculationResult::new(request, positions, houses, provenance)
     }
 }
 
@@ -179,6 +208,13 @@ fn error_message(buffer: &[c_char]) -> String {
     unsafe { CStr::from_ptr(buffer.as_ptr()) }
         .to_string_lossy()
         .into_owned()
+}
+
+fn native_version() -> String {
+    let mut buffer = [0 as c_char; sys::SE_MAX_STNAME];
+    // SAFETY: the output buffer is valid and the global adapter lock is held.
+    unsafe { sys::swe_version(buffer.as_mut_ptr()) };
+    error_message(&buffer)
 }
 
 fn source_name(flag: i32) -> &'static str {

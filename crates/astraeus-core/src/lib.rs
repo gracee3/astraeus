@@ -10,6 +10,6 @@ mod types;
 pub use adapter::{DeterministicMock, EphemerisAdapter};
 pub use error::{CalculationError, ValidationError};
 pub use types::{
-    Ayanamsa, CalculationRequest, CalculationResult, CelestialObject, GeographicLocation,
-    HouseCusps, HouseSystem, Position, UtcInstant, Zodiac,
+    Ayanamsa, CalculationProvenance, CalculationRequest, CalculationResult, CelestialObject,
+    EphemerisSource, GeographicLocation, HouseCusps, HouseSystem, Position, UtcInstant, Zodiac,
 };

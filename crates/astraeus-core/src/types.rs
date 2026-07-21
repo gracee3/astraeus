@@ -54,6 +54,82 @@ pub enum HouseSystem {
     WholeSign,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EphemerisSource {
+    Synthetic,
+    Moshier,
+    SwissFiles,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CalculationProvenance {
+    provider: String,
+    provider_version: String,
+    ephemeris_source: EphemerisSource,
+    data_revision: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct CalculationProvenanceWire {
+    provider: String,
+    provider_version: String,
+    ephemeris_source: EphemerisSource,
+    data_revision: Option<String>,
+}
+
+impl<'de> Deserialize<'de> for CalculationProvenance {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = CalculationProvenanceWire::deserialize(deserializer)?;
+        Self::new(
+            wire.provider,
+            wire.provider_version,
+            wire.ephemeris_source,
+            wire.data_revision,
+        )
+        .map_err(serde::de::Error::custom)
+    }
+}
+
+impl CalculationProvenance {
+    pub fn new(
+        provider: impl Into<String>,
+        provider_version: impl Into<String>,
+        ephemeris_source: EphemerisSource,
+        data_revision: Option<String>,
+    ) -> Result<Self, ValidationError> {
+        let provider = provider.into();
+        let provider_version = provider_version.into();
+        validate_text("provider", &provider)?;
+        validate_text("provider_version", &provider_version)?;
+        if let Some(revision) = &data_revision {
+            validate_text("data_revision", revision)?;
+        }
+        Ok(Self {
+            provider,
+            provider_version,
+            ephemeris_source,
+            data_revision,
+        })
+    }
+
+    pub fn provider(&self) -> &str {
+        &self.provider
+    }
+    pub fn provider_version(&self) -> &str {
+        &self.provider_version
+    }
+    pub fn ephemeris_source(&self) -> EphemerisSource {
+        self.ephemeris_source
+    }
+    pub fn data_revision(&self) -> Option<&str> {
+        self.data_revision.as_deref()
+    }
+}
+
 /// A timestamp normalized to UTC on construction.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(transparent)]
@@ -368,6 +444,7 @@ impl<'de> Deserialize<'de> for CalculationRequest {
 pub struct CalculationResult {
     positions: std::collections::BTreeMap<CelestialObject, Position>,
     houses: HouseCusps,
+    provenance: CalculationProvenance,
 }
 
 impl CalculationResult {
@@ -375,6 +452,7 @@ impl CalculationResult {
         request: &CalculationRequest,
         positions: std::collections::BTreeMap<CelestialObject, Position>,
         houses: HouseCusps,
+        provenance: CalculationProvenance,
     ) -> Result<Self, crate::CalculationError> {
         for object in request.objects() {
             if !positions.contains_key(object) {
@@ -386,7 +464,11 @@ impl CalculationResult {
                 return Err(crate::CalculationError::UnexpectedObject(*object));
             }
         }
-        Ok(Self { positions, houses })
+        Ok(Self {
+            positions,
+            houses,
+            provenance,
+        })
     }
 
     pub fn positions(&self) -> &std::collections::BTreeMap<CelestialObject, Position> {
@@ -395,6 +477,10 @@ impl CalculationResult {
 
     pub fn houses(&self) -> &HouseCusps {
         &self.houses
+    }
+
+    pub fn provenance(&self) -> &CalculationProvenance {
+        &self.provenance
     }
 }
 
@@ -411,6 +497,14 @@ fn validate_finite(field: &'static str, value: f64) -> Result<(), ValidationErro
         Ok(())
     } else {
         Err(ValidationError::NonFinite { field })
+    }
+}
+
+fn validate_text(field: &'static str, value: &str) -> Result<(), ValidationError> {
+    if value.trim().is_empty() {
+        Err(ValidationError::EmptyText { field })
+    } else {
+        Ok(())
     }
 }
 

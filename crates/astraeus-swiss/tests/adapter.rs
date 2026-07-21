@@ -4,6 +4,7 @@ use astraeus_core::{
 };
 use astraeus_fixtures::{GoldenFixture, parse_swetest_output};
 use astraeus_swiss::SwissEphemerisAdapter;
+use std::sync::Arc;
 
 const FIXTURES: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -30,6 +31,44 @@ fn moshier_matches_tropical_and_sidereal_references() {
 }
 
 #[test]
+fn successful_results_record_provider_source_and_version() {
+    let adapter = SwissEphemerisAdapter::moshier();
+    let fixture = fixture("j2000-greenwich-tropical-placidus");
+    let result = adapter.calculate(fixture.request()).unwrap();
+    assert_eq!(result.provenance().provider(), "Swiss Ephemeris");
+    assert_eq!(result.provenance().provider_version(), "2.10.03");
+    assert_eq!(
+        result.provenance().ephemeris_source(),
+        astraeus_core::EphemerisSource::Moshier
+    );
+    assert_eq!(result.provenance().data_revision(), None);
+}
+
+#[test]
+fn concurrent_tropical_and_sidereal_requests_do_not_leak_global_state() {
+    let adapter = Arc::new(SwissEphemerisAdapter::moshier());
+    let mut threads = Vec::new();
+    for index in 0..8 {
+        let adapter = Arc::clone(&adapter);
+        threads.push(std::thread::spawn(move || {
+            let name = if index % 2 == 0 {
+                "j2000-greenwich-tropical-placidus"
+            } else {
+                "j2000-greenwich-sidereal-lahiri-placidus"
+            };
+            let fixture = fixture(name);
+            for _ in 0..50 {
+                let result = adapter.calculate(fixture.request()).unwrap();
+                fixture.compare(&result).unwrap();
+            }
+        }));
+    }
+    for thread in threads {
+        thread.join().unwrap();
+    }
+}
+
+#[test]
 fn swiss_mode_rejects_silent_moshier_fallback() {
     let directory = tempfile::tempdir().unwrap();
     let adapter = SwissEphemerisAdapter::swiss_files(directory.path()).unwrap();
@@ -37,6 +76,24 @@ fn swiss_mode_rejects_silent_moshier_fallback() {
     assert!(matches!(
         adapter.calculate(fixture.request()),
         Err(CalculationError::DataUnavailable(_))
+    ));
+}
+
+#[test]
+fn undefined_polar_houses_are_explicit_failures() {
+    let fixture = fixture("j2000-greenwich-tropical-placidus");
+    let request = CalculationRequest::new(
+        fixture.request().instant(),
+        GeographicLocation::new(89.0, 0.0, 0.0).unwrap(),
+        vec![CelestialObject::Sun],
+        Zodiac::Tropical,
+        None,
+        HouseSystem::Placidus,
+    )
+    .unwrap();
+    assert!(matches!(
+        SwissEphemerisAdapter::moshier().calculate(&request),
+        Err(CalculationError::Provider(_))
     ));
 }
 
@@ -93,7 +150,11 @@ fn every_public_ayanamsa_maps_to_a_native_mode() {
 #[ignore = "set ASTRAEUS_SWISS_EPHEMERIS_PATH to a directory containing pinned .se1 files"]
 fn swiss_files_match_tropical_and_sidereal_references() {
     let path = std::env::var("ASTRAEUS_SWISS_EPHEMERIS_PATH").unwrap();
-    let adapter = SwissEphemerisAdapter::swiss_files(path).unwrap();
+    let adapter = SwissEphemerisAdapter::swiss_files_with_revision(
+        path,
+        "cae9ecd4b201544d85e411aced17660932514d43",
+    )
+    .unwrap();
     for (zodiac, ayanamsa, file) in [
         (
             Zodiac::Tropical,
@@ -122,6 +183,10 @@ fn swiss_files_match_tropical_and_sidereal_references() {
         let raw = std::fs::read_to_string(format!("{FIXTURES}/{file}")).unwrap();
         let expected = parse_swetest_output(&request, &raw).unwrap();
         let actual = adapter.calculate(&request).unwrap();
+        assert_eq!(
+            actual.provenance().data_revision(),
+            Some("cae9ecd4b201544d85e411aced17660932514d43")
+        );
         for (object, expected_position) in expected.positions() {
             let actual_position = actual.positions().get(object).unwrap();
             assert!(

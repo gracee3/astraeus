@@ -25,6 +25,8 @@ pub enum ValidationError {
     InvalidUtcInstant(String),
     #[error("house cusps must contain exactly 12 values, got {0}")]
     InvalidHouseCount(usize),
+    #[error("{field} must not be empty")]
+    EmptyText { field: &'static str },
 }
 
 /// A complete calculation failed; partial results are never successful.
