@@ -50,6 +50,10 @@ into a separately versioned, content-addressed
 [derived chart artifact](docs/DERIVED_ARTIFACTS.md) with typed angles, derived
 South Nodes, sign/house placements, and revalidated aspects.
 
+`astraeus-western` adds separately versioned
+[Western policy artifacts](docs/WESTERN_POLICIES.md) for traditional/modern
+rulership, essential dignity, and selectable Chaldean/triplicity decans.
+
 ## License
 
 AGPL-3.0-or-later. Swiss Ephemeris has its own dual-license requirements; its
