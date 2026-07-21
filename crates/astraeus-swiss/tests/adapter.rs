@@ -2,6 +2,7 @@ use astraeus_core::{
     Ayanamsa, CalculationError, CalculationRequest, CelestialObject, EphemerisAdapter,
     GeographicLocation, HouseSystem, UtcInstant, Zodiac,
 };
+use astraeus_events::{EventCoordinateFrame, EventPositionProvider, EventPositionRequest};
 use astraeus_fixtures::{GoldenFixture, parse_swetest_output};
 use astraeus_swiss::SwissEphemerisAdapter;
 use std::sync::Arc;
@@ -146,6 +147,41 @@ fn every_public_ayanamsa_maps_to_a_native_mode() {
             .calculate(&request)
             .unwrap();
     }
+}
+
+#[test]
+fn event_sampling_is_house_independent_and_supports_birth_epoch_ecliptic() {
+    let adapter = SwissEphemerisAdapter::moshier();
+    let future = UtcInstant::parse_rfc3339("2050-01-01T00:00:00Z").unwrap();
+    let tropical = adapter
+        .sample_event_positions(
+            &EventPositionRequest::new(
+                future,
+                vec![CelestialObject::Sun],
+                EventCoordinateFrame::TropicalOfDate,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let birth_epoch = adapter
+        .sample_event_positions(
+            &EventPositionRequest::new(
+                future,
+                vec![CelestialObject::Sun],
+                EventCoordinateFrame::BirthEpochEcliptic {
+                    epoch: UtcInstant::parse_rfc3339("2000-01-01T12:00:00Z").unwrap(),
+                },
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    assert!(
+        (tropical.positions()[&CelestialObject::Sun].longitude_degrees()
+            - birth_epoch.positions()[&CelestialObject::Sun].longitude_degrees())
+        .abs()
+            > 0.1
+    );
+    assert_eq!(tropical.provenance().provider(), "Swiss Ephemeris");
 }
 
 #[test]

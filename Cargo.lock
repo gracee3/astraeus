@@ -93,6 +93,7 @@ name = "astraeus-swiss"
 version = "0.1.0"
 dependencies = [
  "astraeus-core",
+ "astraeus-events",
  "astraeus-fixtures",
  "chrono",
  "sweph-sys",
