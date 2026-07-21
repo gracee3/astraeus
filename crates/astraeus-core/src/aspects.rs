@@ -4,6 +4,12 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{CelestialObject, Position, ValidationError};
 
+/// Maximum angular error still classified as exact.
+pub const ASPECT_EXACT_TOLERANCE_DEGREES: f64 = 1e-9;
+
+/// Maximum absolute relative speed classified as a relative station.
+pub const ASPECT_STATION_TOLERANCE_DEGREES_PER_DAY: f64 = 1e-12;
+
 /// The five conventional Ptolemaic aspects.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -13,6 +19,16 @@ pub enum AspectKind {
     Square,
     Trine,
     Opposition,
+}
+
+/// Instantaneous motion state relative to an aspect's exact angle.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AspectPhase {
+    Applying,
+    Exact,
+    Separating,
+    Stationary,
 }
 
 impl AspectKind {
@@ -121,39 +137,69 @@ pub struct Aspect {
     second: CelestialObject,
     kind: AspectKind,
     separation_degrees: f64,
+    signed_separation_degrees: f64,
     orb_degrees: f64,
+    relative_speed_degrees_per_day: f64,
+    phase: AspectPhase,
 }
 
 impl Aspect {
-    fn new(
-        first: CelestialObject,
-        second: CelestialObject,
-        kind: AspectKind,
-        separation_degrees: f64,
-        orb_degrees: f64,
-    ) -> Result<Self, ValidationError> {
-        if first >= second {
+    fn from_wire(wire: AspectWire) -> Result<Self, ValidationError> {
+        if wire.first >= wire.second {
             return Err(ValidationError::InvalidAspectPair);
         }
-        if !separation_degrees.is_finite() || !(0.0..=180.0).contains(&separation_degrees) {
+        if !wire.separation_degrees.is_finite() || !(0.0..=180.0).contains(&wire.separation_degrees)
+        {
             return Err(ValidationError::InvalidAspectSeparation(
-                separation_degrees.to_string(),
+                wire.separation_degrees.to_string(),
             ));
         }
-        let expected_orb = (separation_degrees - kind.angle_degrees()).abs();
-        if !orb_degrees.is_finite() || (orb_degrees - expected_orb).abs() > 1e-12 {
+        if !wire.signed_separation_degrees.is_finite()
+            || wire.signed_separation_degrees <= -180.0
+            || wire.signed_separation_degrees > 180.0
+        {
+            return Err(ValidationError::InvalidSignedAspectSeparation(
+                wire.signed_separation_degrees.to_string(),
+            ));
+        }
+        if (wire.signed_separation_degrees.abs() - wire.separation_degrees).abs()
+            > ASPECT_EXACT_TOLERANCE_DEGREES
+        {
+            return Err(ValidationError::InconsistentAspectSeparation);
+        }
+        let expected_orb = (wire.separation_degrees - wire.kind.angle_degrees()).abs();
+        if !wire.orb_degrees.is_finite() || (wire.orb_degrees - expected_orb).abs() > 1e-12 {
             return Err(ValidationError::InconsistentAspectOrb {
-                kind,
+                kind: wire.kind,
                 expected: expected_orb.to_string(),
-                actual: orb_degrees.to_string(),
+                actual: wire.orb_degrees.to_string(),
+            });
+        }
+        if !wire.relative_speed_degrees_per_day.is_finite() {
+            return Err(ValidationError::InvalidRelativeSpeed(
+                wire.relative_speed_degrees_per_day.to_string(),
+            ));
+        }
+        let expected_phase = classify_phase(
+            wire.signed_separation_degrees,
+            wire.kind,
+            wire.relative_speed_degrees_per_day,
+        );
+        if wire.phase != expected_phase {
+            return Err(ValidationError::InconsistentAspectPhase {
+                expected: expected_phase,
+                actual: wire.phase,
             });
         }
         Ok(Self {
-            first,
-            second,
-            kind,
-            separation_degrees,
-            orb_degrees,
+            first: wire.first,
+            second: wire.second,
+            kind: wire.kind,
+            separation_degrees: wire.separation_degrees,
+            signed_separation_degrees: wire.signed_separation_degrees,
+            orb_degrees: wire.orb_degrees,
+            relative_speed_degrees_per_day: wire.relative_speed_degrees_per_day,
+            phase: wire.phase,
         })
     }
 
@@ -169,9 +215,19 @@ impl Aspect {
     pub fn separation_degrees(self) -> f64 {
         self.separation_degrees
     }
+    /// Oriented separation from the first object to the second in (-180, 180].
+    pub fn signed_separation_degrees(self) -> f64 {
+        self.signed_separation_degrees
+    }
     /// Absolute distance from the aspect's exact angle.
     pub fn orb_degrees(self) -> f64 {
         self.orb_degrees
+    }
+    pub fn relative_speed_degrees_per_day(self) -> f64 {
+        self.relative_speed_degrees_per_day
+    }
+    pub fn phase(self) -> AspectPhase {
+        self.phase
     }
 }
 
@@ -182,7 +238,10 @@ struct AspectWire {
     second: CelestialObject,
     kind: AspectKind,
     separation_degrees: f64,
+    signed_separation_degrees: f64,
     orb_degrees: f64,
+    relative_speed_degrees_per_day: f64,
+    phase: AspectPhase,
 }
 
 impl<'de> Deserialize<'de> for Aspect {
@@ -191,14 +250,7 @@ impl<'de> Deserialize<'de> for Aspect {
         D: Deserializer<'de>,
     {
         let wire = AspectWire::deserialize(deserializer)?;
-        Self::new(
-            wire.first,
-            wire.second,
-            wire.kind,
-            wire.separation_degrees,
-            wire.orb_degrees,
-        )
-        .map_err(serde::de::Error::custom)
+        Self::from_wire(wire).map_err(serde::de::Error::custom)
     }
 }
 
@@ -216,9 +268,13 @@ pub fn calculate_aspects(
         let (first, first_position) = *entry;
         for entry in &entries[index + 1..] {
             let (second, second_position) = *entry;
-            let raw =
-                (first_position.longitude_degrees() - second_position.longitude_degrees()).abs();
-            let separation = raw.min(360.0 - raw);
+            let signed_separation = signed_separation(
+                first_position.longitude_degrees(),
+                second_position.longitude_degrees(),
+            );
+            let separation = signed_separation.abs();
+            let relative_speed = second_position.longitude_speed_degrees_per_day()
+                - first_position.longitude_speed_degrees_per_day();
             let best = definitions
                 .as_slice()
                 .iter()
@@ -240,10 +296,41 @@ pub fn calculate_aspects(
                     second: *second,
                     kind: definition.kind(),
                     separation_degrees: separation,
+                    signed_separation_degrees: signed_separation,
                     orb_degrees: orb,
+                    relative_speed_degrees_per_day: relative_speed,
+                    phase: classify_phase(signed_separation, definition.kind(), relative_speed),
                 });
             }
         }
     }
     aspects
+}
+
+fn signed_separation(first_longitude: f64, second_longitude: f64) -> f64 {
+    let separation = (second_longitude - first_longitude).rem_euclid(360.0);
+    if separation > 180.0 {
+        separation - 360.0
+    } else {
+        separation
+    }
+}
+
+fn classify_phase(signed_separation: f64, kind: AspectKind, relative_speed: f64) -> AspectPhase {
+    let angle = kind.angle_degrees();
+    let signed_target = if signed_separation < 0.0 {
+        -angle
+    } else {
+        angle
+    };
+    let deviation = signed_separation - signed_target;
+    if deviation.abs() <= ASPECT_EXACT_TOLERANCE_DEGREES {
+        AspectPhase::Exact
+    } else if relative_speed.abs() <= ASPECT_STATION_TOLERANCE_DEGREES_PER_DAY {
+        AspectPhase::Stationary
+    } else if deviation * relative_speed < 0.0 {
+        AspectPhase::Applying
+    } else {
+        AspectPhase::Separating
+    }
 }

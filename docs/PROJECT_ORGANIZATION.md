@@ -23,6 +23,10 @@ The expanded golden matrix verifies a second date and location with Koch
 houses and Fagan–Bradley sidereal mode in addition to the original Greenwich
 Placidus tropical/Lahiri pair.
 
+Aspect results now include validated instantaneous motion phase with explicit
+exactitude and relative-station thresholds and defined conjunction/opposition
+boundary behavior.
+
 ## Recommendation
 
 Run four independent tracks:

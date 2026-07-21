@@ -1,12 +1,16 @@
 use std::collections::BTreeMap;
 
 use astraeus_core::{
-    Aspect, AspectDefinition, AspectDefinitions, AspectKind, CelestialObject, Position,
-    ValidationError, calculate_aspects,
+    ASPECT_EXACT_TOLERANCE_DEGREES, Aspect, AspectDefinition, AspectDefinitions, AspectKind,
+    AspectPhase, CelestialObject, Position, ValidationError, calculate_aspects,
 };
 
 fn position(longitude: f64) -> Position {
-    Position::new(longitude, 0.0, 1.0, 0.0).unwrap()
+    position_with_speed(longitude, 0.0)
+}
+
+fn position_with_speed(longitude: f64, speed: f64) -> Position {
+    Position::new(longitude, 0.0, 1.0, speed).unwrap()
 }
 
 #[test]
@@ -29,6 +33,75 @@ fn detects_every_ptolemaic_aspect_at_exactitude() {
         assert_eq!(aspects[0].kind(), kind);
         assert_eq!(aspects[0].separation_degrees(), longitude);
         assert_eq!(aspects[0].orb_degrees(), 0.0);
+        assert_eq!(aspects[0].phase(), AspectPhase::Exact);
+    }
+}
+
+#[test]
+fn phase_tracks_motion_on_both_sides_of_an_aspect() {
+    let definitions = AspectDefinitions::new(vec![
+        AspectDefinition::new(AspectKind::Square, 2.0).unwrap(),
+    ])
+    .unwrap();
+    for (longitude, speed, expected) in [
+        (89.0, 1.0, AspectPhase::Applying),
+        (91.0, 1.0, AspectPhase::Separating),
+        (271.0, -1.0, AspectPhase::Applying),
+        (269.0, -1.0, AspectPhase::Separating),
+    ] {
+        let positions = BTreeMap::from([
+            (CelestialObject::Sun, position(0.0)),
+            (CelestialObject::Moon, position_with_speed(longitude, speed)),
+        ]);
+        assert_eq!(
+            calculate_aspects(&positions, &definitions)[0].phase(),
+            expected
+        );
+    }
+}
+
+#[test]
+fn conjunction_and_opposition_wraparound_preserve_phase() {
+    for (kind, first, second, speed) in [
+        (AspectKind::Conjunction, 359.0, 1.0, -1.0),
+        (AspectKind::Conjunction, 1.0, 359.0, 1.0),
+        (AspectKind::Opposition, 0.0, 179.0, 1.0),
+        (AspectKind::Opposition, 0.0, 181.0, -1.0),
+    ] {
+        let definitions =
+            AspectDefinitions::new(vec![AspectDefinition::new(kind, 2.0).unwrap()]).unwrap();
+        let positions = BTreeMap::from([
+            (CelestialObject::Sun, position(first)),
+            (CelestialObject::Moon, position_with_speed(second, speed)),
+        ]);
+        assert_eq!(
+            calculate_aspects(&positions, &definitions)[0].phase(),
+            AspectPhase::Applying
+        );
+    }
+}
+
+#[test]
+fn exactitude_precedes_stationary_classification() {
+    let definitions = AspectDefinitions::new(vec![
+        AspectDefinition::new(AspectKind::Square, 2.0).unwrap(),
+    ])
+    .unwrap();
+    for (longitude, expected) in [
+        (89.0, AspectPhase::Stationary),
+        (
+            90.0 + ASPECT_EXACT_TOLERANCE_DEGREES / 2.0,
+            AspectPhase::Exact,
+        ),
+    ] {
+        let positions = BTreeMap::from([
+            (CelestialObject::Sun, position_with_speed(0.0, 1.0)),
+            (CelestialObject::Moon, position_with_speed(longitude, 1.0)),
+        ]);
+        assert_eq!(
+            calculate_aspects(&positions, &definitions)[0].phase(),
+            expected
+        );
     }
 }
 
@@ -161,4 +234,20 @@ fn json_cannot_bypass_definition_validation() {
     ] {
         assert!(serde_json::from_str::<Aspect>(invalid).is_err());
     }
+
+    let definitions = AspectDefinitions::new(vec![
+        AspectDefinition::new(AspectKind::Square, 2.0).unwrap(),
+    ])
+    .unwrap();
+    let positions = BTreeMap::from([
+        (CelestialObject::Sun, position(0.0)),
+        (CelestialObject::Moon, position_with_speed(89.0, 1.0)),
+    ]);
+    let aspect = calculate_aspects(&positions, &definitions)[0];
+    let json = serde_json::to_string(&aspect).unwrap();
+    assert_eq!(serde_json::from_str::<Aspect>(&json).unwrap(), aspect);
+    assert!(
+        serde_json::from_str::<Aspect>(&json.replacen("\"applying\"", "\"separating\"", 1))
+            .is_err()
+    );
 }

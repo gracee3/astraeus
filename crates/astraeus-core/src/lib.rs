@@ -9,7 +9,10 @@ mod error;
 mod types;
 
 pub use adapter::{DeterministicMock, EphemerisAdapter};
-pub use aspects::{Aspect, AspectDefinition, AspectDefinitions, AspectKind, calculate_aspects};
+pub use aspects::{
+    ASPECT_EXACT_TOLERANCE_DEGREES, ASPECT_STATION_TOLERANCE_DEGREES_PER_DAY, Aspect,
+    AspectDefinition, AspectDefinitions, AspectKind, AspectPhase, calculate_aspects,
+};
 pub use error::{CalculationError, ValidationError};
 pub use types::{
     Ayanamsa, CalculationOptions, CalculationProvenance, CalculationRequest, CalculationResult,
