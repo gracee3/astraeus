@@ -13,6 +13,7 @@ use astraeus_core::{
 };
 use astraeus_derived::DerivedChartArtifact;
 use astraeus_specifications::ChartSpecification;
+use astraeus_techniques::harmonic;
 
 fn chart(longitude: f64, speed: f64, zodiac: Zodiac) -> DerivedChartArtifact {
     let ayanamsa = (zodiac == Zodiac::Sidereal).then_some(astraeus_core::Ayanamsa::Lahiri);
@@ -165,5 +166,25 @@ fn comparison_artifact_round_trips_and_rejects_tampering() {
     assert!(matches!(
         ComparisonArtifact::from_json(&json.replacen("\"applying\"", "\"separating\"", 1)),
         Err(ComparisonArtifactError::AspectMismatch)
+    ));
+}
+
+#[test]
+fn static_synthetic_layers_reject_motion_dependent_comparisons() {
+    let natal = chart(0.0, 1.0, Zodiac::Tropical);
+    let harmonic = harmonic(&chart(45.0, 1.0, Zodiac::Tropical), 2).unwrap();
+    let specification = ComparisonSpecification::moving_second(
+        ComparisonKind::HarmonicToNatal,
+        square(),
+        points(),
+        points(),
+    )
+    .unwrap();
+    assert!(matches!(
+        ComparisonArtifact::new(natal, harmonic, specification),
+        Err(ComparisonArtifactError::MissingMotion {
+            side: "second",
+            point: ChartPointId::Sun
+        })
     ));
 }

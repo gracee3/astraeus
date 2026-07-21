@@ -3,16 +3,102 @@
 use std::collections::BTreeMap;
 
 use astraeus_core::{
-    ASPECT_EXACT_TOLERANCE_DEGREES, ASPECT_STATION_TOLERANCE_DEGREES_PER_DAY, AngularPosition,
-    AspectDefinitions, AspectKind, AspectPhase, ChartPointId, ChartPointSelection,
-    chart_point_positions,
+    ASPECT_EXACT_TOLERANCE_DEGREES, ASPECT_STATION_TOLERANCE_DEGREES_PER_DAY, AspectDefinitions,
+    AspectKind, AspectPhase, ChartPointId, ChartPointSelection, chart_point_positions,
 };
 use astraeus_derived::DerivedChartArtifact;
+use astraeus_techniques::{ProgressedChartArtifact, SyntheticChartArtifact};
 use serde::{Deserialize, Serialize, Serializer};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 pub const SCHEMA_VERSION: u32 = 1;
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "layer_kind", content = "artifact", rename_all = "snake_case")]
+pub enum ChartLayerArtifact {
+    Physical(DerivedChartArtifact),
+    Progressed(ProgressedChartArtifact),
+    Synthetic(SyntheticChartArtifact),
+}
+
+#[derive(Clone, Copy)]
+struct LayerPoint {
+    longitude_degrees: f64,
+    motion_degrees_per_day: Option<f64>,
+}
+
+impl From<DerivedChartArtifact> for ChartLayerArtifact {
+    fn from(value: DerivedChartArtifact) -> Self {
+        Self::Physical(value)
+    }
+}
+impl From<ProgressedChartArtifact> for ChartLayerArtifact {
+    fn from(value: ProgressedChartArtifact) -> Self {
+        Self::Progressed(value)
+    }
+}
+impl From<SyntheticChartArtifact> for ChartLayerArtifact {
+    fn from(value: SyntheticChartArtifact) -> Self {
+        Self::Synthetic(value)
+    }
+}
+
+impl ChartLayerArtifact {
+    fn frame(&self) -> (astraeus_core::Zodiac, Option<astraeus_core::Ayanamsa>) {
+        match self {
+            Self::Physical(chart) => {
+                let request = chart.calculation().request();
+                (request.zodiac(), request.ayanamsa())
+            }
+            Self::Progressed(chart) => (chart.zodiac(), chart.ayanamsa()),
+            Self::Synthetic(chart) => (chart.zodiac(), chart.ayanamsa()),
+        }
+    }
+    fn points(&self) -> Result<BTreeMap<ChartPointId, LayerPoint>, ComparisonArtifactError> {
+        match self {
+            Self::Physical(chart) => Ok(chart_point_positions(chart.calculation().result())
+                .map_err(|error| ComparisonArtifactError::InvalidPointData(error.to_string()))?
+                .into_iter()
+                .map(|(id, p)| {
+                    (
+                        id,
+                        LayerPoint {
+                            longitude_degrees: p.longitude_degrees(),
+                            motion_degrees_per_day: Some(p.longitude_speed_degrees_per_day()),
+                        },
+                    )
+                })
+                .collect()),
+            Self::Progressed(chart) => Ok(chart
+                .points()
+                .iter()
+                .map(|(id, p)| {
+                    (
+                        *id,
+                        LayerPoint {
+                            longitude_degrees: p.longitude_degrees(),
+                            motion_degrees_per_day: p.motion_degrees_per_target_day(),
+                        },
+                    )
+                })
+                .collect()),
+            Self::Synthetic(chart) => Ok(chart
+                .points()
+                .iter()
+                .map(|(id, p)| {
+                    (
+                        *id,
+                        LayerPoint {
+                            longitude_degrees: p.longitude_degrees(),
+                            motion_degrees_per_day: p.motion_degrees_per_target_day(),
+                        },
+                    )
+                })
+                .collect()),
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -146,8 +232,8 @@ impl InterChartAspect {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ComparisonArtifact {
-    first: DerivedChartArtifact,
-    second: DerivedChartArtifact,
+    first: ChartLayerArtifact,
+    second: ChartLayerArtifact,
     specification: ComparisonSpecification,
     aspects: Vec<InterChartAspect>,
 }
@@ -155,8 +241,8 @@ pub struct ComparisonArtifact {
 #[derive(Serialize)]
 struct ArtifactRef<'a> {
     schema_version: u32,
-    first: &'a DerivedChartArtifact,
-    second: &'a DerivedChartArtifact,
+    first: &'a ChartLayerArtifact,
+    second: &'a ChartLayerArtifact,
     specification: &'a ComparisonSpecification,
     aspects: &'a [InterChartAspect],
 }
@@ -165,8 +251,8 @@ struct ArtifactRef<'a> {
 #[serde(deny_unknown_fields)]
 struct ArtifactWire {
     schema_version: u32,
-    first: DerivedChartArtifact,
-    second: DerivedChartArtifact,
+    first: ChartLayerArtifact,
+    second: ChartLayerArtifact,
     specification: ComparisonSpecification,
     aspects: Vec<InterChartAspect>,
 }
@@ -188,32 +274,33 @@ pub enum ComparisonArtifactError {
     },
     #[error("serialized inter-chart aspects do not match the charts and policy")]
     AspectMismatch,
+    #[error("comparison motion policy requires motion for {side} point {point:?}")]
+    MissingMotion {
+        side: &'static str,
+        point: ChartPointId,
+    },
     #[error("invalid chart point data: {0}")]
     InvalidPointData(String),
 }
 
 impl ComparisonArtifact {
     pub fn new(
-        first: DerivedChartArtifact,
-        second: DerivedChartArtifact,
+        first: impl Into<ChartLayerArtifact>,
+        second: impl Into<ChartLayerArtifact>,
         specification: ComparisonSpecification,
     ) -> Result<Self, ComparisonArtifactError> {
+        let first = first.into();
+        let second = second.into();
         if specification.first_points.as_slice().is_empty()
             || specification.second_points.as_slice().is_empty()
         {
             return Err(ComparisonArtifactError::EmptyPointSelection);
         }
-        let first_request = first.calculation().request();
-        let second_request = second.calculation().request();
-        if first_request.zodiac() != second_request.zodiac()
-            || first_request.ayanamsa() != second_request.ayanamsa()
-        {
+        if first.frame() != second.frame() {
             return Err(ComparisonArtifactError::CoordinateFrameMismatch);
         }
-        let first_all = chart_point_positions(first.calculation().result())
-            .map_err(|error| ComparisonArtifactError::InvalidPointData(error.to_string()))?;
-        let second_all = chart_point_positions(second.calculation().result())
-            .map_err(|error| ComparisonArtifactError::InvalidPointData(error.to_string()))?;
+        let first_all = first.points()?;
+        let second_all = second.points()?;
         let first_points = select_points(&first_all, &specification.first_points, "first")?;
         let second_points = select_points(&second_all, &specification.second_points, "second")?;
         let aspects = calculate_inter_chart_aspects(
@@ -221,7 +308,7 @@ impl ComparisonArtifact {
             &second_points,
             &specification.aspects,
             specification.motion,
-        );
+        )?;
         Ok(Self {
             first,
             second,
@@ -244,11 +331,11 @@ impl ComparisonArtifact {
         Ok(artifact)
     }
 
-    pub fn first(&self) -> &DerivedChartArtifact {
+    pub fn first(&self) -> &ChartLayerArtifact {
         &self.first
     }
 
-    pub fn second(&self) -> &DerivedChartArtifact {
+    pub fn second(&self) -> &ChartLayerArtifact {
         &self.second
     }
 
@@ -314,10 +401,10 @@ impl<'de> Deserialize<'de> for ComparisonArtifact {
 }
 
 fn select_points(
-    all: &BTreeMap<ChartPointId, AngularPosition>,
+    all: &BTreeMap<ChartPointId, LayerPoint>,
     selection: &ChartPointSelection,
     side: &'static str,
-) -> Result<BTreeMap<ChartPointId, AngularPosition>, ComparisonArtifactError> {
+) -> Result<BTreeMap<ChartPointId, LayerPoint>, ComparisonArtifactError> {
     selection
         .as_slice()
         .iter()
@@ -334,17 +421,17 @@ fn select_points(
 }
 
 fn calculate_inter_chart_aspects(
-    first: &BTreeMap<ChartPointId, AngularPosition>,
-    second: &BTreeMap<ChartPointId, AngularPosition>,
+    first: &BTreeMap<ChartPointId, LayerPoint>,
+    second: &BTreeMap<ChartPointId, LayerPoint>,
     definitions: &AspectDefinitions,
     motion: ComparisonMotionPolicy,
-) -> Vec<InterChartAspect> {
+) -> Result<Vec<InterChartAspect>, ComparisonArtifactError> {
     let mut aspects = Vec::new();
     for (first_id, first_position) in first {
         for (second_id, second_position) in second {
             let signed_separation = signed_separation(
-                first_position.longitude_degrees(),
-                second_position.longitude_degrees(),
+                first_position.longitude_degrees,
+                second_position.longitude_degrees,
             );
             let separation = signed_separation.abs();
             let best = definitions
@@ -364,11 +451,25 @@ fn calculate_inter_chart_aspects(
                 let relative_speed = match motion {
                     ComparisonMotionPolicy::None => None,
                     ComparisonMotionPolicy::SecondMovesAgainstFirstFixed => {
-                        Some(second_position.longitude_speed_degrees_per_day())
+                        Some(second_position.motion_degrees_per_day.ok_or(
+                            ComparisonArtifactError::MissingMotion {
+                                side: "second",
+                                point: *second_id,
+                            },
+                        )?)
                     }
                     ComparisonMotionPolicy::BothInstantaneous => Some(
-                        second_position.longitude_speed_degrees_per_day()
-                            - first_position.longitude_speed_degrees_per_day(),
+                        second_position.motion_degrees_per_day.ok_or(
+                            ComparisonArtifactError::MissingMotion {
+                                side: "second",
+                                point: *second_id,
+                            },
+                        )? - first_position.motion_degrees_per_day.ok_or(
+                            ComparisonArtifactError::MissingMotion {
+                                side: "first",
+                                point: *first_id,
+                            },
+                        )?,
                     ),
                 };
                 aspects.push(InterChartAspect {
@@ -385,7 +486,7 @@ fn calculate_inter_chart_aspects(
             }
         }
     }
-    aspects
+    Ok(aspects)
 }
 
 fn signed_separation(first_longitude: f64, second_longitude: f64) -> f64 {

@@ -19,3 +19,9 @@ Implemented method policies are versioned and explicit:
 Synthetic houses are never fabricated. Harmonics and solar arcs omit houses.
 Composites include cusp midpoints only when `midpoint_angles_and_cusps` is
 requested.
+
+Technique artifacts embed the source charts needed to recompute every derived
+longitude, symbolic instant, midpoint, and method-defined motion value during
+deserialization. Static harmonics and composites have no motion. Continuous
+progressions and direct solar arcs express motion per real target day;
+stepwise tertiary-I and natal-fixed points have no instantaneous motion.
