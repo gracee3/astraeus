@@ -9,8 +9,9 @@ use astraeus_core::{
 use astraeus_derived::DerivedChartArtifact;
 use astraeus_specifications::ChartSpecification;
 use astraeus_techniques::{
-    ArcApplication, CompositeFramework, ProgressionMethod, SolarArcMethod, TechniqueError,
-    harmonic, midpoint_composite, solar_arc, symbolic_instant,
+    AnglePolicy, ArcApplication, CompositeFramework, ProgressionMethod, SolarArcMethod,
+    SyntheticChartArtifact, TechniqueError, cast_progressed, harmonic, midpoint_composite,
+    solar_arc, symbolic_instant,
 };
 
 fn chart(longitude: f64) -> DerivedChartArtifact {
@@ -114,4 +115,61 @@ fn naibod_arc_can_be_restricted_to_angles() {
         20.0
     );
     assert!(directed.points()[&ChartPointId::Ascendant].longitude_degrees() > 0.9);
+}
+
+#[test]
+fn technique_motion_is_defined_only_when_the_method_defines_it() {
+    let natal = chart(20.0);
+    let adapter = DeterministicMock::new(
+        natal.calculation().result().positions().clone(),
+        natal.calculation().result().houses().clone(),
+    );
+    let target = UtcInstant::parse_rfc3339("2001-01-01T12:00:00Z").unwrap();
+    let secondary = cast_progressed(
+        &adapter,
+        &natal,
+        target,
+        ProgressionMethod::Secondary,
+        AnglePolicy::NatalFixed,
+    )
+    .unwrap();
+    assert!(
+        secondary.points()[&ChartPointId::Sun]
+            .motion_degrees_per_target_day()
+            .is_some()
+    );
+    assert_eq!(
+        secondary.points()[&ChartPointId::Ascendant].motion_degrees_per_target_day(),
+        None
+    );
+    let tertiary = cast_progressed(
+        &adapter,
+        &natal,
+        target,
+        ProgressionMethod::TertiaryI,
+        AnglePolicy::RecastAtSymbolicInstant,
+    )
+    .unwrap();
+    assert_eq!(
+        tertiary.points()[&ChartPointId::Sun].motion_degrees_per_target_day(),
+        None
+    );
+}
+
+#[test]
+fn synthetic_artifact_revalidates_derived_values() {
+    let artifact = harmonic(&chart(20.0), 2).unwrap();
+    let json = artifact.to_json().unwrap();
+    assert_eq!(SyntheticChartArtifact::from_json(&json).unwrap(), artifact);
+    let mut tampered: serde_json::Value = serde_json::from_str(&json).unwrap();
+    tampered["points"]["sun"]["longitude_degrees"] = serde_json::json!(41.0);
+    assert!(SyntheticChartArtifact::from_json(&tampered.to_string()).is_err());
+    assert!(
+        SyntheticChartArtifact::from_json(&json.replacen(
+            "\"schema_version\":1",
+            "\"schema_version\":2",
+            1
+        ))
+        .is_err()
+    );
 }

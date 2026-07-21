@@ -21,6 +21,7 @@ dependencies = [
  "astraeus-core",
  "astraeus-derived",
  "astraeus-specifications",
+ "astraeus-techniques",
  "serde",
  "serde_json",
  "sha2",
