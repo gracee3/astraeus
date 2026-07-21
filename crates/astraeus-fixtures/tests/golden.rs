@@ -22,6 +22,8 @@ fn committed_tropical_and_sidereal_references_are_self_consistent() {
     for name in [
         "j2000-greenwich-tropical-placidus",
         "j2000-greenwich-sidereal-lahiri-placidus",
+        "2024-new-york-tropical-koch",
+        "2024-new-york-sidereal-fagan-koch",
     ] {
         let (fixture, raw) = load(name);
         fixture.verify_raw_output(&raw).unwrap();

@@ -13,6 +13,12 @@ The first fixtures describe apparent, geocentric ecliptic-of-date positions at
 degrees, astronomical-unit distances, and longitude speed in degrees per day.
 The sidereal fixture selects Lahiri (`swetest -sid1`).
 
+The expanded matrix adds `2024-04-08T18:00:00Z` at New York City coordinates
+(latitude 40.7128°, longitude -74.006°, elevation metadata 10 m), Koch houses,
+and both tropical and Fagan–Bradley sidereal (`swetest -sid0`) calculations.
+This deliberately changes date, location, house algorithm, and ayanamsa while
+retaining the same object set and numerical tolerances.
+
 These fixtures explicitly use the built-in Moshier engine (`-emos`). They prove
 the input, output, sidereal, speed, house, provenance, and tolerance contracts
 without requiring Swiss `.se1` data files. They do not validate a future native
@@ -53,6 +59,14 @@ Run the sidereal reference by adding `-sid1` after `-emos`:
 ```text
 ./swetest -b1.1.2000 -ut12:00:00 -p0123456789mt -emos -sid1 -speed -fPTlbRs -g, -head -house0.0000,51.4779,P
 ```
+
+Run the New York tropical reference with Koch houses:
+
+```text
+./swetest -b8.4.2024 -ut18:00:00 -p0123456789mt -emos -speed -fPTlbRs -g, -head -house-74.0060,40.7128,K
+```
+
+Run its Fagan–Bradley sidereal pair by adding `-sid0` after `-emos`.
 
 Redirect stdout to the corresponding `.stdout` file. The JSON source record
 contains its expected SHA-256. Tests verify the transcript hash, parse the

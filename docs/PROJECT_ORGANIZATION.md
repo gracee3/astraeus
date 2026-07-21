@@ -19,6 +19,10 @@ policy, and protected ephemeral Swiss-file verification. The chart
 specification checkpoint adds versioned reusable calculation and aspect policy
 without changing calculation artifact schema version 1.
 
+The expanded golden matrix verifies a second date and location with Koch
+houses and Fagan–Bradley sidereal mode in addition to the original Greenwich
+Placidus tropical/Lahiri pair.
+
 ## Recommendation
 
 Run four independent tracks:
