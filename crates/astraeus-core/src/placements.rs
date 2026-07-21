@@ -44,6 +44,13 @@ impl ZodiacSign {
         validate_longitude(longitude_degrees)?;
         Ok(Self::ALL[(longitude_degrees / 30.0).floor() as usize])
     }
+
+    pub fn index(self) -> usize {
+        Self::ALL
+            .iter()
+            .position(|candidate| *candidate == self)
+            .expect("all zodiac signs are present in ZodiacSign::ALL")
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
@@ -94,6 +101,10 @@ impl SignPlacement {
 
     pub fn degrees_within_sign(self) -> f64 {
         self.degrees_within_sign
+    }
+
+    pub fn longitude_degrees(self) -> f64 {
+        self.sign.index() as f64 * 30.0 + self.degrees_within_sign
     }
 }
 
