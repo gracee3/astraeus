@@ -51,6 +51,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "astraeus-events"
+version = "0.1.0"
+dependencies = [
+ "astraeus-artifacts",
+ "astraeus-core",
+ "astraeus-derived",
+ "astraeus-specifications",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+]
+
+[[package]]
 name = "astraeus-fixtures"
 version = "0.1.0"
 dependencies = [

@@ -62,6 +62,10 @@ motion semantics for synastry, transits, progressions, returns, and research.
 techniques](docs/TECHNIQUES.md): progressions, direct solar arcs, harmonics,
 midpoint composites, and Davison charts.
 
+`astraeus-events` provides [exact event solving](docs/EVENTS.md) for returns,
+lunations, ingresses, and seasonal points, producing ordinary charts at the
+resolved instant.
+
 ## License
 
 AGPL-3.0-or-later. Swiss Ephemeris has its own dual-license requirements; its
