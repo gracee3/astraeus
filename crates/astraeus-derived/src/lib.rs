@@ -1,7 +1,10 @@
 //! Validated, content-addressed derived chart artifacts.
 
 use astraeus_artifacts::CalculationArtifact;
-use astraeus_core::{Aspect, calculate_aspects};
+use astraeus_core::{
+    Aspect, PointPlacement, ValidationError, calculate_aspects, calculate_placements,
+    chart_point_positions,
+};
 use astraeus_specifications::ChartSpecification;
 use serde::{Deserialize, Serialize, Serializer};
 use sha2::{Digest, Sha256};
@@ -13,6 +16,7 @@ pub const SCHEMA_VERSION: u32 = 1;
 pub struct DerivedChartArtifact {
     calculation: CalculationArtifact,
     specification: ChartSpecification,
+    placements: Vec<PointPlacement>,
     aspects: Vec<Aspect>,
 }
 
@@ -21,6 +25,7 @@ struct DerivedRef<'a> {
     schema_version: u32,
     calculation: &'a CalculationArtifact,
     specification: &'a ChartSpecification,
+    placements: &'a [PointPlacement],
     aspects: &'a [Aspect],
 }
 
@@ -30,6 +35,7 @@ struct DerivedWire {
     schema_version: u32,
     calculation: CalculationArtifact,
     specification: ChartSpecification,
+    placements: Vec<PointPlacement>,
     aspects: Vec<Aspect>,
 }
 
@@ -43,6 +49,10 @@ pub enum DerivedArtifactError {
     CalculationPolicyMismatch,
     #[error("serialized aspects do not match aspects derived from the calculation")]
     AspectMismatch,
+    #[error("serialized placements do not match placements derived from the calculation")]
+    PlacementMismatch,
+    #[error(transparent)]
+    InvalidDerivedValue(#[from] ValidationError),
 }
 
 impl DerivedChartArtifact {
@@ -53,10 +63,19 @@ impl DerivedChartArtifact {
         if calculation.request().options() != *specification.calculation() {
             return Err(DerivedArtifactError::CalculationPolicyMismatch);
         }
-        let aspects = calculate_aspects(calculation.result().positions(), specification.aspects());
+        let all_points = chart_point_positions(calculation.result())?;
+        let aspect_points = specification
+            .aspect_points()
+            .as_slice()
+            .iter()
+            .map(|point| (*point, all_points[point]))
+            .collect();
+        let placements = calculate_placements(calculation.result())?;
+        let aspects = calculate_aspects(&aspect_points, specification.aspects());
         Ok(Self {
             calculation,
             specification,
+            placements,
             aspects,
         })
     }
@@ -71,6 +90,9 @@ impl DerivedChartArtifact {
             return Err(DerivedArtifactError::UnsupportedSchema(wire.schema_version));
         }
         let derived = Self::new(wire.calculation, wire.specification)?;
+        if derived.placements != wire.placements {
+            return Err(DerivedArtifactError::PlacementMismatch);
+        }
         if derived.aspects != wire.aspects {
             return Err(DerivedArtifactError::AspectMismatch);
         }
@@ -87,6 +109,10 @@ impl DerivedChartArtifact {
 
     pub fn aspects(&self) -> &[Aspect] {
         &self.aspects
+    }
+
+    pub fn placements(&self) -> &[PointPlacement] {
+        &self.placements
     }
 
     pub fn to_json(&self) -> Result<String, DerivedArtifactError> {
@@ -125,6 +151,7 @@ impl Serialize for DerivedChartArtifact {
             schema_version: SCHEMA_VERSION,
             calculation: &self.calculation,
             specification: &self.specification,
+            placements: &self.placements,
             aspects: &self.aspects,
         }
         .serialize(serializer)

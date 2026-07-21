@@ -42,7 +42,7 @@ fn schema_v1_round_trips_and_builds_requests() {
     assert_eq!(request.house_system(), HouseSystem::WholeSign);
     assert_eq!(
         json,
-        r#"{"schema_version":1,"calculation":{"objects":["sun","moon"],"zodiac":"sidereal","ayanamsa":"lahiri","house_system":"whole_sign"},"aspects":[{"kind":"conjunction","orb_degrees":8.0},{"kind":"opposition","orb_degrees":8.0}]}"#
+        r#"{"schema_version":1,"calculation":{"objects":["sun","moon"],"zodiac":"sidereal","ayanamsa":"lahiri","house_system":"whole_sign"},"aspects":[{"kind":"conjunction","orb_degrees":8.0},{"kind":"opposition","orb_degrees":8.0}],"aspect_points":["sun","moon","ascendant","midheaven","descendant","imum_coeli","vertex"]}"#
     );
 }
 

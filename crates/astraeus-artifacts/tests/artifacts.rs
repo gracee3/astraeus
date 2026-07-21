@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use astraeus_artifacts::{ArtifactError, CalculationArtifact};
 use astraeus_core::{
-    CalculationRequest, CelestialObject, DeterministicMock, EphemerisAdapter, GeographicLocation,
-    HouseCusps, HouseSystem, Position, UtcInstant, Zodiac,
+    AngularPosition, CalculationRequest, CelestialObject, ChartAngles, DeterministicMock,
+    EphemerisAdapter, GeographicLocation, HouseCusps, HouseSystem, Position, UtcInstant, Zodiac,
 };
 
 fn artifact() -> CalculationArtifact {
@@ -22,8 +22,12 @@ fn artifact() -> CalculationArtifact {
     )]);
     let houses = HouseCusps::new(
         (0..12).map(|index| f64::from(index) * 30.0).collect(),
-        0.0,
-        270.0,
+        ChartAngles::new(
+            AngularPosition::new(0.0, 360.0).unwrap(),
+            AngularPosition::new(270.0, 360.0).unwrap(),
+            AngularPosition::new(180.0, 360.0).unwrap(),
+        )
+        .unwrap(),
     )
     .unwrap();
     let result = DeterministicMock::new(positions, houses)
@@ -49,7 +53,7 @@ fn canonical_json_round_trips_without_changing_identity() {
     );
     assert_eq!(
         artifact.content_sha256().unwrap(),
-        "27c1888234284dfa5c754c5b264116bcb947596a9b80404c889f43c191db7861"
+        "2c2a67043bdc129710a5c99b085877fdaa8fb5e16c036b121ea006520c12bf78"
     );
 }
 

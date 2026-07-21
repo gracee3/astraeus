@@ -23,6 +23,89 @@ pub enum CelestialObject {
     Chiron,
 }
 
+/// Every physical or derived point supported by chart derivation and aspects.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChartPointId {
+    Sun,
+    Moon,
+    Mercury,
+    Venus,
+    Mars,
+    Jupiter,
+    Saturn,
+    Uranus,
+    Neptune,
+    Pluto,
+    MeanNode,
+    TrueNode,
+    Chiron,
+    MeanSouthNode,
+    TrueSouthNode,
+    Ascendant,
+    Midheaven,
+    Descendant,
+    ImumCoeli,
+    Vertex,
+}
+
+impl From<CelestialObject> for ChartPointId {
+    fn from(value: CelestialObject) -> Self {
+        match value {
+            CelestialObject::Sun => Self::Sun,
+            CelestialObject::Moon => Self::Moon,
+            CelestialObject::Mercury => Self::Mercury,
+            CelestialObject::Venus => Self::Venus,
+            CelestialObject::Mars => Self::Mars,
+            CelestialObject::Jupiter => Self::Jupiter,
+            CelestialObject::Saturn => Self::Saturn,
+            CelestialObject::Uranus => Self::Uranus,
+            CelestialObject::Neptune => Self::Neptune,
+            CelestialObject::Pluto => Self::Pluto,
+            CelestialObject::MeanNode => Self::MeanNode,
+            CelestialObject::TrueNode => Self::TrueNode,
+            CelestialObject::Chiron => Self::Chiron,
+        }
+    }
+}
+
+impl ChartPointId {
+    pub const fn celestial_object(self) -> Option<CelestialObject> {
+        match self {
+            Self::Sun => Some(CelestialObject::Sun),
+            Self::Moon => Some(CelestialObject::Moon),
+            Self::Mercury => Some(CelestialObject::Mercury),
+            Self::Venus => Some(CelestialObject::Venus),
+            Self::Mars => Some(CelestialObject::Mars),
+            Self::Jupiter => Some(CelestialObject::Jupiter),
+            Self::Saturn => Some(CelestialObject::Saturn),
+            Self::Uranus => Some(CelestialObject::Uranus),
+            Self::Neptune => Some(CelestialObject::Neptune),
+            Self::Pluto => Some(CelestialObject::Pluto),
+            Self::MeanNode => Some(CelestialObject::MeanNode),
+            Self::TrueNode => Some(CelestialObject::TrueNode),
+            Self::Chiron => Some(CelestialObject::Chiron),
+            Self::MeanSouthNode
+            | Self::TrueSouthNode
+            | Self::Ascendant
+            | Self::Midheaven
+            | Self::Descendant
+            | Self::ImumCoeli
+            | Self::Vertex => None,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChartAngle {
+    Ascendant,
+    Midheaven,
+    Descendant,
+    ImumCoeli,
+    Vertex,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Zodiac {
@@ -221,6 +304,137 @@ pub struct Position {
     longitude_speed_degrees_per_day: f64,
 }
 
+/// Longitude and instantaneous motion for an angle or another longitude-only point.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct AngularPosition {
+    longitude_degrees: f64,
+    longitude_speed_degrees_per_day: f64,
+}
+
+impl AngularPosition {
+    pub fn new(
+        longitude_degrees: f64,
+        longitude_speed_degrees_per_day: f64,
+    ) -> Result<Self, ValidationError> {
+        validate_longitude(longitude_degrees)?;
+        validate_finite(
+            "longitude_speed_degrees_per_day",
+            longitude_speed_degrees_per_day,
+        )?;
+        Ok(Self {
+            longitude_degrees,
+            longitude_speed_degrees_per_day,
+        })
+    }
+
+    pub fn longitude_degrees(self) -> f64 {
+        self.longitude_degrees
+    }
+
+    pub fn longitude_speed_degrees_per_day(self) -> f64 {
+        self.longitude_speed_degrees_per_day
+    }
+
+    pub fn opposite(self) -> Result<Self, ValidationError> {
+        Self::new(
+            (self.longitude_degrees + 180.0).rem_euclid(360.0),
+            self.longitude_speed_degrees_per_day,
+        )
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AngularPositionWire {
+    longitude_degrees: f64,
+    longitude_speed_degrees_per_day: f64,
+}
+
+impl<'de> Deserialize<'de> for AngularPosition {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = AngularPositionWire::deserialize(deserializer)?;
+        Self::new(wire.longitude_degrees, wire.longitude_speed_degrees_per_day)
+            .map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChartAngles {
+    ascendant: AngularPosition,
+    midheaven: AngularPosition,
+    descendant: AngularPosition,
+    imum_coeli: AngularPosition,
+    vertex: AngularPosition,
+}
+
+impl ChartAngles {
+    pub fn new(
+        ascendant: AngularPosition,
+        midheaven: AngularPosition,
+        vertex: AngularPosition,
+    ) -> Result<Self, ValidationError> {
+        Ok(Self {
+            ascendant,
+            midheaven,
+            descendant: ascendant.opposite()?,
+            imum_coeli: midheaven.opposite()?,
+            vertex,
+        })
+    }
+
+    pub fn get(&self, angle: ChartAngle) -> AngularPosition {
+        match angle {
+            ChartAngle::Ascendant => self.ascendant,
+            ChartAngle::Midheaven => self.midheaven,
+            ChartAngle::Descendant => self.descendant,
+            ChartAngle::ImumCoeli => self.imum_coeli,
+            ChartAngle::Vertex => self.vertex,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ChartAnglesWire {
+    ascendant: AngularPosition,
+    midheaven: AngularPosition,
+    descendant: AngularPosition,
+    imum_coeli: AngularPosition,
+    vertex: AngularPosition,
+}
+
+impl<'de> Deserialize<'de> for ChartAngles {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = ChartAnglesWire::deserialize(deserializer)?;
+        let angles = Self::new(wire.ascendant, wire.midheaven, wire.vertex)
+            .map_err(serde::de::Error::custom)?;
+        if !angular_positions_match(angles.descendant, wire.descendant)
+            || !angular_positions_match(angles.imum_coeli, wire.imum_coeli)
+        {
+            return Err(serde::de::Error::custom(
+                "descendant/imum_coeli do not oppose ascendant/midheaven",
+            ));
+        }
+        Ok(angles)
+    }
+}
+
+fn angular_positions_match(first: AngularPosition, second: AngularPosition) -> bool {
+    let longitude_difference = (first.longitude_degrees() - second.longitude_degrees())
+        .abs()
+        .min(360.0 - (first.longitude_degrees() - second.longitude_degrees()).abs());
+    longitude_difference <= 1e-9
+        && (first.longitude_speed_degrees_per_day() - second.longitude_speed_degrees_per_day())
+            .abs()
+            <= 1e-9
+}
+
 impl Position {
     pub fn new(
         longitude_degrees: f64,
@@ -290,16 +504,11 @@ impl<'de> Deserialize<'de> for Position {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct HouseCusps {
     cusps_degrees: [f64; 12],
-    ascendant_degrees: f64,
-    midheaven_degrees: f64,
+    angles: ChartAngles,
 }
 
 impl HouseCusps {
-    pub fn new(
-        cusps_degrees: Vec<f64>,
-        ascendant_degrees: f64,
-        midheaven_degrees: f64,
-    ) -> Result<Self, ValidationError> {
+    pub fn new(cusps_degrees: Vec<f64>, angles: ChartAngles) -> Result<Self, ValidationError> {
         let count = cusps_degrees.len();
         let cusps_degrees: [f64; 12] = cusps_degrees
             .try_into()
@@ -307,12 +516,21 @@ impl HouseCusps {
         for value in cusps_degrees {
             validate_longitude(value)?;
         }
-        validate_longitude(ascendant_degrees)?;
-        validate_longitude(midheaven_degrees)?;
+        let total_arc: f64 = (0..12)
+            .map(|index| {
+                let next = cusps_degrees[(index + 1) % 12];
+                (next - cusps_degrees[index]).rem_euclid(360.0)
+            })
+            .sum();
+        if cusps_degrees.windows(2).any(|pair| pair[0] == pair[1])
+            || cusps_degrees[11] == cusps_degrees[0]
+            || (total_arc - 360.0).abs() > 1e-8
+        {
+            return Err(ValidationError::InvalidHouseTopology);
+        }
         Ok(Self {
             cusps_degrees,
-            ascendant_degrees,
-            midheaven_degrees,
+            angles,
         })
     }
 
@@ -320,18 +538,20 @@ impl HouseCusps {
         &self.cusps_degrees
     }
     pub fn ascendant_degrees(&self) -> f64 {
-        self.ascendant_degrees
+        self.angles.get(ChartAngle::Ascendant).longitude_degrees()
     }
     pub fn midheaven_degrees(&self) -> f64 {
-        self.midheaven_degrees
+        self.angles.get(ChartAngle::Midheaven).longitude_degrees()
+    }
+    pub fn angles(&self) -> &ChartAngles {
+        &self.angles
     }
 }
 
 #[derive(Deserialize)]
 struct HouseCuspsWire {
     cusps_degrees: Vec<f64>,
-    ascendant_degrees: f64,
-    midheaven_degrees: f64,
+    angles: ChartAngles,
 }
 
 impl<'de> Deserialize<'de> for HouseCusps {
@@ -340,12 +560,7 @@ impl<'de> Deserialize<'de> for HouseCusps {
         D: Deserializer<'de>,
     {
         let wire = HouseCuspsWire::deserialize(deserializer)?;
-        Self::new(
-            wire.cusps_degrees,
-            wire.ascendant_degrees,
-            wire.midheaven_degrees,
-        )
-        .map_err(serde::de::Error::custom)
+        Self::new(wire.cusps_degrees, wire.angles).map_err(serde::de::Error::custom)
     }
 }
 

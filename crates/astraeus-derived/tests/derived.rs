@@ -2,9 +2,10 @@ use std::collections::BTreeMap;
 
 use astraeus_artifacts::CalculationArtifact;
 use astraeus_core::{
-    AspectDefinition, AspectDefinitions, AspectKind, AspectPhase, CalculationOptions,
-    CalculationRequest, CelestialObject, DeterministicMock, EphemerisAdapter, GeographicLocation,
-    HouseCusps, HouseSystem, Position, UtcInstant, Zodiac,
+    AngularPosition, AspectDefinition, AspectDefinitions, AspectKind, AspectPhase,
+    CalculationOptions, CalculationRequest, CelestialObject, ChartAngles, ChartPointId,
+    ChartPointSelection, DeterministicMock, EphemerisAdapter, GeographicLocation, HouseCusps,
+    HouseSystem, Position, UtcInstant, Zodiac,
 };
 use astraeus_derived::{DerivedArtifactError, DerivedChartArtifact};
 use astraeus_specifications::ChartSpecification;
@@ -34,21 +35,27 @@ fn inputs() -> (CalculationArtifact, ChartSpecification) {
     ]);
     let houses = HouseCusps::new(
         (0..12).map(|index| f64::from(index) * 30.0).collect(),
-        0.0,
-        270.0,
+        ChartAngles::new(
+            AngularPosition::new(0.0, 360.0).unwrap(),
+            AngularPosition::new(270.0, 360.0).unwrap(),
+            AngularPosition::new(180.0, 360.0).unwrap(),
+        )
+        .unwrap(),
     )
     .unwrap();
     let result = DeterministicMock::new(positions, houses)
         .calculate(&request)
         .unwrap();
     let calculation = CalculationArtifact::new(request, result).unwrap();
-    let specification = ChartSpecification::new(
+    let specification = ChartSpecification::with_aspect_points(
         options,
         AspectDefinitions::new(vec![
             AspectDefinition::new(AspectKind::Square, 2.0).unwrap(),
         ])
         .unwrap(),
-    );
+        ChartPointSelection::new(vec![ChartPointId::Sun, ChartPointId::Moon]).unwrap(),
+    )
+    .unwrap();
     (calculation, specification)
 }
 
@@ -69,7 +76,7 @@ fn derived_artifact_round_trips_with_stable_identity() {
     );
     assert_eq!(
         artifact.content_sha256().unwrap(),
-        "ab21a3d7a41790bf099c59ae387b843f78d4336136cffce88b124cb4212801eb"
+        "defc7d052eab84b0942b37ebb54b3f621c55979aa1b78b780f3304695501aa11"
     );
 }
 

@@ -47,7 +47,8 @@ choices and aspect policy without changing calculation artifact schema v1.
 
 `astraeus-derived` combines a calculation artifact and matching specification
 into a separately versioned, content-addressed
-[derived chart artifact](docs/DERIVED_ARTIFACTS.md) with revalidated aspects.
+[derived chart artifact](docs/DERIVED_ARTIFACTS.md) with typed angles, derived
+South Nodes, sign/house placements, and revalidated aspects.
 
 ## License
 

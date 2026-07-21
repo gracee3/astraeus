@@ -70,13 +70,15 @@ Run its Fagan–Bradley sidereal pair by adding `-sid0` after `-emos`.
 
 Redirect stdout to the corresponding `.stdout` file. The JSON source record
 contains its expected SHA-256. Tests verify the transcript hash, parse the
-selected rows, and compare every requested position, cusp, Ascendant, and MC
-with the normalized JSON values.
+selected rows, and compare every requested position, cusp, Ascendant, MC, and
+Vertex with the normalized JSON values. ASC/MC/DSC/IC/Vertex speeds are also
+checked against the adapter's symmetric 30-second numerical derivative.
 
 The format uses schema version 1 and rejects unknown top-level and expected
-fields. Angular and speed tolerance is `1e-6` degrees (or degrees/day), and
-distance tolerance is `1e-9` AU. Longitude and house comparisons account for
-wrap-around at 0°/360°.
+fields. Angular and celestial-object speed tolerance is `1e-6` degrees (or
+degrees/day), angle-speed tolerance is `0.005` degrees/day, and distance
+tolerance is `1e-9` AU. Longitude and house comparisons account for wrap-around
+at 0°/360°.
 
 ## Swiss-file suite
 

@@ -1,4 +1,4 @@
-use crate::CelestialObject;
+use crate::{CelestialObject, ChartPointId};
 use thiserror::Error;
 
 /// A malformed domain value, rejected before an ephemeris is invoked.
@@ -17,6 +17,8 @@ pub enum ValidationError {
     EmptyObjectSet,
     #[error("celestial objects must not contain duplicates: {0:?}")]
     DuplicateObject(CelestialObject),
+    #[error("chart points must not contain duplicates: {0:?}")]
+    DuplicateChartPoint(ChartPointId),
     #[error("sidereal calculations require an ayanamsa")]
     MissingAyanamsa,
     #[error("tropical calculations must not specify an ayanamsa")]
@@ -25,6 +27,10 @@ pub enum ValidationError {
     InvalidUtcInstant(String),
     #[error("house cusps must contain exactly 12 values, got {0}")]
     InvalidHouseCount(usize),
+    #[error("house number must be in 1..=12, got {0}")]
+    InvalidHouseNumber(u8),
+    #[error("house cusps must be distinct and ordered through exactly one zodiac revolution")]
+    InvalidHouseTopology,
     #[error("{field} must not be empty")]
     EmptyText { field: &'static str },
     #[error("aspect orb must be finite and in 0..=180 degrees, got {0}")]

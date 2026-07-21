@@ -6,6 +6,7 @@
 mod adapter;
 mod aspects;
 mod error;
+mod placements;
 mod types;
 
 pub use adapter::{DeterministicMock, EphemerisAdapter};
@@ -14,8 +15,12 @@ pub use aspects::{
     AspectDefinition, AspectDefinitions, AspectKind, AspectPhase, calculate_aspects,
 };
 pub use error::{CalculationError, ValidationError};
+pub use placements::{
+    ChartPointSelection, HouseNumber, PointPlacement, SignPlacement, ZodiacSign,
+    calculate_placements, chart_point_positions, house_for_longitude,
+};
 pub use types::{
-    Ayanamsa, CalculationOptions, CalculationProvenance, CalculationRequest, CalculationResult,
-    CelestialObject, EphemerisSource, GeographicLocation, HouseCusps, HouseSystem, Position,
-    UtcInstant, Zodiac,
+    AngularPosition, Ayanamsa, CalculationOptions, CalculationProvenance, CalculationRequest,
+    CalculationResult, CelestialObject, ChartAngle, ChartAngles, ChartPointId, EphemerisSource,
+    GeographicLocation, HouseCusps, HouseSystem, Position, UtcInstant, Zodiac,
 };

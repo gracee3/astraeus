@@ -9,8 +9,9 @@ use std::{
 };
 
 use astraeus_core::{
-    Ayanamsa, CalculationError, CalculationProvenance, CalculationRequest, CalculationResult,
-    CelestialObject, EphemerisAdapter, EphemerisSource, HouseCusps, HouseSystem, Position, Zodiac,
+    AngularPosition, Ayanamsa, CalculationError, CalculationProvenance, CalculationRequest,
+    CalculationResult, CelestialObject, ChartAngles, EphemerisAdapter, EphemerisSource, HouseCusps,
+    HouseSystem, Position, Zodiac,
 };
 use chrono::{Datelike, Timelike};
 use sweph_sys as sys;
@@ -146,28 +147,19 @@ impl SwissEphemerisAdapter {
             );
         }
 
-        let mut cusps = [0.0; 13];
-        let mut angles = [0.0; 10];
-        // SAFETY: buffers have the sizes required for twelve-house systems; lock is held.
-        let house_status = unsafe {
-            sys::swe_houses_ex(
-                jd,
-                source_flag | sidereal_flag,
-                request.location().latitude_degrees(),
-                request.location().longitude_degrees(),
-                house_code(request.house_system()),
-                cusps.as_mut_ptr(),
-                angles.as_mut_ptr(),
+        let house_flags = source_flag | sidereal_flag;
+        let (cusps, angles) = calculate_houses(jd, house_flags, request)?;
+        let (_, previous_angles) = calculate_houses(jd - 30.0 / 86_400.0, house_flags, request)?;
+        let (_, next_angles) = calculate_houses(jd + 30.0 / 86_400.0, house_flags, request)?;
+        let angle_position = |index| {
+            AngularPosition::new(
+                angles[index],
+                signed_angular_difference(previous_angles[index], next_angles[index]) * 1_440.0,
             )
         };
-        if house_status < 0 {
-            return Err(CalculationError::Provider(format!(
-                "{:?} houses could not be calculated at latitude {}",
-                request.house_system(),
-                request.location().latitude_degrees()
-            )));
-        }
-        let houses = HouseCusps::new(cusps[1..13].to_vec(), angles[0], angles[1])?;
+        let chart_angles =
+            ChartAngles::new(angle_position(0)?, angle_position(1)?, angle_position(3)?)?;
+        let houses = HouseCusps::new(cusps[1..13].to_vec(), chart_angles)?;
         let source = match self.mode {
             EphemerisMode::Moshier => EphemerisSource::Moshier,
             EphemerisMode::SwissFiles(_) => EphemerisSource::SwissFiles,
@@ -179,6 +171,44 @@ impl SwissEphemerisAdapter {
             self.data_revision.clone(),
         )?;
         CalculationResult::new(request, positions, houses, provenance)
+    }
+}
+
+fn calculate_houses(
+    jd: f64,
+    flags: i32,
+    request: &CalculationRequest,
+) -> Result<([f64; 13], [f64; 10]), CalculationError> {
+    let mut cusps = [0.0; 13];
+    let mut angles = [0.0; 10];
+    // SAFETY: buffers have the sizes required for twelve-house systems; lock is held.
+    let status = unsafe {
+        sys::swe_houses_ex(
+            jd,
+            flags,
+            request.location().latitude_degrees(),
+            request.location().longitude_degrees(),
+            house_code(request.house_system()),
+            cusps.as_mut_ptr(),
+            angles.as_mut_ptr(),
+        )
+    };
+    if status < 0 {
+        return Err(CalculationError::Provider(format!(
+            "{:?} houses could not be calculated at latitude {}",
+            request.house_system(),
+            request.location().latitude_degrees()
+        )));
+    }
+    Ok((cusps, angles))
+}
+
+fn signed_angular_difference(first: f64, second: f64) -> f64 {
+    let difference = (second - first).rem_euclid(360.0);
+    if difference > 180.0 {
+        difference - 360.0
+    } else {
+        difference
     }
 }
 

@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::{CelestialObject, Position, ValidationError};
+use crate::{AngularPosition, ChartPointId, ValidationError};
 
 /// Maximum angular error still classified as exact.
 pub const ASPECT_EXACT_TOLERANCE_DEGREES: f64 = 1e-9;
@@ -130,11 +130,11 @@ impl<'de> Deserialize<'de> for AspectDefinitions {
     }
 }
 
-/// A detected aspect. Objects are always ordered by [`CelestialObject`].
+/// A detected aspect. Points are always ordered by [`ChartPointId`].
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct Aspect {
-    first: CelestialObject,
-    second: CelestialObject,
+    first: ChartPointId,
+    second: ChartPointId,
     kind: AspectKind,
     separation_degrees: f64,
     signed_separation_degrees: f64,
@@ -203,10 +203,10 @@ impl Aspect {
         })
     }
 
-    pub fn first(self) -> CelestialObject {
+    pub fn first(self) -> ChartPointId {
         self.first
     }
-    pub fn second(self) -> CelestialObject {
+    pub fn second(self) -> ChartPointId {
         self.second
     }
     pub fn kind(self) -> AspectKind {
@@ -234,8 +234,8 @@ impl Aspect {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct AspectWire {
-    first: CelestialObject,
-    second: CelestialObject,
+    first: ChartPointId,
+    second: ChartPointId,
     kind: AspectKind,
     separation_degrees: f64,
     signed_separation_degrees: f64,
@@ -259,7 +259,7 @@ impl<'de> Deserialize<'de> for Aspect {
 /// At most one aspect is emitted per object pair. If configured aspect windows
 /// overlap, the closest exact angle wins; [`AspectKind`] order breaks exact ties.
 pub fn calculate_aspects(
-    positions: &BTreeMap<CelestialObject, Position>,
+    positions: &BTreeMap<ChartPointId, AngularPosition>,
     definitions: &AspectDefinitions,
 ) -> Vec<Aspect> {
     let entries: Vec<_> = positions.iter().collect();

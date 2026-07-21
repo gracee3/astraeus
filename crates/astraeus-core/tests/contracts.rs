@@ -11,7 +11,16 @@ fn instant() -> UtcInstant {
 }
 
 fn houses() -> HouseCusps {
-    HouseCusps::new((0..12).map(|n| f64::from(n) * 30.0).collect(), 0.0, 270.0).unwrap()
+    HouseCusps::new(
+        (0..12).map(|n| f64::from(n) * 30.0).collect(),
+        ChartAngles::new(
+            AngularPosition::new(0.0, 360.0).unwrap(),
+            AngularPosition::new(270.0, 360.0).unwrap(),
+            AngularPosition::new(180.0, 360.0).unwrap(),
+        )
+        .unwrap(),
+    )
+    .unwrap()
 }
 
 #[test]
@@ -215,8 +224,7 @@ fn deserialization_preserves_domain_validation() {
 
     let invalid_houses = r#"{
         "cusps_degrees": [0.0, 30.0],
-        "ascendant_degrees": 0.0,
-        "midheaven_degrees": 270.0
+        "angles": {}
     }"#;
     assert!(serde_json::from_str::<HouseCusps>(invalid_houses).is_err());
 }

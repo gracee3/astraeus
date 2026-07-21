@@ -10,6 +10,11 @@ Schema version 1 is a JSON object containing:
 - the complete validated `CalculationRequest`; and
 - the complete `CalculationResult`, including provenance.
 
+Because no Astraeus release or tag existed, schema v1 was finalized before its
+first release to include validated ASC, MC, DSC, IC, and Vertex positions with
+instantaneous longitude speeds. The earlier pre-release JSON shape and content
+hashes are intentionally not supported.
+
 Deserialization reconstructs every domain value through its validation path
 and rechecks that the result contains exactly the request's object set. Unknown
 fields and unsupported schema versions fail explicitly.
