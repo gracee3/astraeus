@@ -15,5 +15,11 @@ callers do not supply or precession-correct a target longitude.
 Each result includes solver metadata and an ordinary derived chart cast at the
 exact instant and caller-provided location. Event artifacts embed their exact
 position sample and, for returns, their natal target sample; all residual and
-target fields are revalidated during deserialization. Global eclipse maxima
-use a separate Swiss-native boundary.
+target fields are revalidated during deserialization.
+
+Global solar and lunar eclipse searches use the Swiss native global-maximum
+functions. Previous, nearest, and next selection use the same earlier-event
+tie rule. Eclipse artifacts record the normalized native classification,
+provider provenance, exact UTC maximum, and Julian-day conversion residual,
+then embed an ordinary chart at the caller's location. They intentionally omit
+magnitude, local visibility, contacts, and geographic paths.

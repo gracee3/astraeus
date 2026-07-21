@@ -15,4 +15,5 @@ sweph-sys.workspace = true
 
 [dev-dependencies]
 astraeus-fixtures = { version = "0.1.0", path = "../astraeus-fixtures" }
+astraeus-specifications = { version = "0.1.0", path = "../astraeus-specifications" }
 tempfile = "3.20.0"

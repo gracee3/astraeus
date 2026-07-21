@@ -90,10 +90,10 @@ impl DerivedChartArtifact {
             return Err(DerivedArtifactError::UnsupportedSchema(wire.schema_version));
         }
         let derived = Self::new(wire.calculation, wire.specification)?;
-        if derived.placements != wire.placements {
+        if !placements_match(&derived.placements, &wire.placements) {
             return Err(DerivedArtifactError::PlacementMismatch);
         }
-        if derived.aspects != wire.aspects {
+        if !aspects_match(&derived.aspects, &wire.aspects) {
             return Err(DerivedArtifactError::AspectMismatch);
         }
         Ok(derived)
@@ -130,6 +130,35 @@ impl DerivedChartArtifact {
     pub fn content_id(&self) -> Result<String, DerivedArtifactError> {
         Ok(format!("sha256:{}", self.content_sha256()?))
     }
+}
+
+fn placements_match(first: &[PointPlacement], second: &[PointPlacement]) -> bool {
+    first.len() == second.len()
+        && first.iter().zip(second).all(|(first, second)| {
+            first.point() == second.point()
+                && first.house() == second.house()
+                && first.sign().sign() == second.sign().sign()
+                && (first.sign().degrees_within_sign() - second.sign().degrees_within_sign()).abs()
+                    <= 1e-12
+        })
+}
+
+fn aspects_match(first: &[Aspect], second: &[Aspect]) -> bool {
+    first.len() == second.len()
+        && first.iter().zip(second).all(|(first, second)| {
+            first.first() == second.first()
+                && first.second() == second.second()
+                && first.kind() == second.kind()
+                && first.phase() == second.phase()
+                && (first.separation_degrees() - second.separation_degrees()).abs() <= 1e-12
+                && (first.signed_separation_degrees() - second.signed_separation_degrees()).abs()
+                    <= 1e-12
+                && (first.orb_degrees() - second.orb_degrees()).abs() <= 1e-12
+                && (first.relative_speed_degrees_per_day()
+                    - second.relative_speed_degrees_per_day())
+                .abs()
+                    <= 1e-12
+        })
 }
 
 impl<'de> Deserialize<'de> for DerivedChartArtifact {

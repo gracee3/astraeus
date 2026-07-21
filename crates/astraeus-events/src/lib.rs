@@ -263,6 +263,199 @@ struct ArtifactWire {
     chart: DerivedChartArtifact,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EclipseKind {
+    Solar,
+    Lunar,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EclipseClassification {
+    Central,
+    Noncentral,
+    Total,
+    Annular,
+    Partial,
+    Hybrid,
+    Penumbral,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EclipseSearchDirection {
+    Backward,
+    Forward,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct GlobalEclipseSearch {
+    pub kind: EclipseKind,
+    pub reference: UtcInstant,
+    pub selection: EventSelection,
+    pub window_days: f64,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GlobalEclipseSearchWire {
+    kind: EclipseKind,
+    reference: UtcInstant,
+    selection: EventSelection,
+    window_days: f64,
+}
+
+impl GlobalEclipseSearch {
+    pub fn new(
+        kind: EclipseKind,
+        reference: UtcInstant,
+        selection: EventSelection,
+        window_days: f64,
+    ) -> Result<Self, EventError> {
+        if !window_days.is_finite() || window_days <= 0.0 {
+            return Err(EventError::InvalidSearch);
+        }
+        Ok(Self {
+            kind,
+            reference,
+            selection,
+            window_days,
+        })
+    }
+}
+impl<'de> Deserialize<'de> for GlobalEclipseSearch {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let w = GlobalEclipseSearchWire::deserialize(d)?;
+        Self::new(w.kind, w.reference, w.selection, w.window_days).map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct GlobalEclipseMaximum {
+    kind: EclipseKind,
+    exact_instant: UtcInstant,
+    classifications: Vec<EclipseClassification>,
+    native_flags: i32,
+    time_conversion_residual_seconds: f64,
+    provenance: CalculationProvenance,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GlobalEclipseMaximumWire {
+    kind: EclipseKind,
+    exact_instant: UtcInstant,
+    classifications: Vec<EclipseClassification>,
+    native_flags: i32,
+    time_conversion_residual_seconds: f64,
+    provenance: CalculationProvenance,
+}
+
+impl GlobalEclipseMaximum {
+    pub fn new(
+        kind: EclipseKind,
+        exact_instant: UtcInstant,
+        mut classifications: Vec<EclipseClassification>,
+        native_flags: i32,
+        time_conversion_residual_seconds: f64,
+        provenance: CalculationProvenance,
+    ) -> Result<Self, EventError> {
+        classifications.sort();
+        classifications.dedup();
+        if native_flags <= 0
+            || classifications != classifications_from_native_flags(native_flags)
+            || !time_conversion_residual_seconds.is_finite()
+            || !(0.0..=DEFAULT_TIME_TOLERANCE_SECONDS).contains(&time_conversion_residual_seconds)
+        {
+            return Err(EventError::InvalidEclipseMaximum);
+        }
+        Ok(Self {
+            kind,
+            exact_instant,
+            classifications,
+            native_flags,
+            time_conversion_residual_seconds,
+            provenance,
+        })
+    }
+    pub fn kind(&self) -> EclipseKind {
+        self.kind
+    }
+    pub fn exact_instant(&self) -> UtcInstant {
+        self.exact_instant
+    }
+    pub fn classifications(&self) -> &[EclipseClassification] {
+        &self.classifications
+    }
+    pub fn provenance(&self) -> &CalculationProvenance {
+        &self.provenance
+    }
+}
+
+fn classifications_from_native_flags(flags: i32) -> Vec<EclipseClassification> {
+    let mut values = Vec::new();
+    for (flag, classification) in [
+        (1, EclipseClassification::Central),
+        (2, EclipseClassification::Noncentral),
+        (4, EclipseClassification::Total),
+        (8, EclipseClassification::Annular),
+        (16, EclipseClassification::Partial),
+        (32, EclipseClassification::Hybrid),
+        (64, EclipseClassification::Penumbral),
+    ] {
+        if flags & flag != 0 {
+            values.push(classification);
+        }
+    }
+    values
+}
+impl<'de> Deserialize<'de> for GlobalEclipseMaximum {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let w = GlobalEclipseMaximumWire::deserialize(d)?;
+        Self::new(
+            w.kind,
+            w.exact_instant,
+            w.classifications,
+            w.native_flags,
+            w.time_conversion_residual_seconds,
+            w.provenance,
+        )
+        .map_err(serde::de::Error::custom)
+    }
+}
+
+pub trait GlobalEclipseProvider {
+    fn find_global_eclipse(
+        &self,
+        kind: EclipseKind,
+        reference: UtcInstant,
+        direction: EclipseSearchDirection,
+    ) -> Result<GlobalEclipseMaximum, EventError>;
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct GlobalEclipseChartArtifact {
+    search: GlobalEclipseSearch,
+    maximum: GlobalEclipseMaximum,
+    chart: DerivedChartArtifact,
+}
+
+#[derive(Serialize)]
+struct EclipseArtifactRef<'a> {
+    schema_version: u32,
+    search: GlobalEclipseSearch,
+    maximum: &'a GlobalEclipseMaximum,
+    chart: &'a DerivedChartArtifact,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EclipseArtifactWire {
+    schema_version: u32,
+    search: GlobalEclipseSearch,
+    maximum: GlobalEclipseMaximum,
+    chart: DerivedChartArtifact,
+}
+
 #[derive(Debug, Error)]
 pub enum EventError {
     #[error("invalid event artifact JSON: {0}")]
@@ -297,6 +490,10 @@ pub enum EventError {
     Calculation(String),
     #[error("invalid event time: {0}")]
     Time(String),
+    #[error("invalid global eclipse maximum")]
+    InvalidEclipseMaximum,
+    #[error("global eclipse maximum is outside the requested window or direction")]
+    EclipseOutsideSearch,
 }
 
 pub fn solve_return<P: EventPositionProvider + EphemerisAdapter>(
@@ -319,6 +516,150 @@ pub fn solve_return<P: EventPositionProvider + EphemerisAdapter>(
         },
         search,
     )
+}
+
+pub fn solve_global_eclipse<P: GlobalEclipseProvider + EphemerisAdapter>(
+    provider: &P,
+    specification: &ChartSpecification,
+    location: GeographicLocation,
+    search: GlobalEclipseSearch,
+) -> Result<GlobalEclipseChartArtifact, EventError> {
+    GlobalEclipseSearch::new(
+        search.kind,
+        search.reference,
+        search.selection,
+        search.window_days,
+    )?;
+    for object in [CelestialObject::Sun, CelestialObject::Moon] {
+        if !specification.calculation().objects().contains(&object) {
+            return Err(EventError::MissingObject(object));
+        }
+    }
+    let maximum = match search.selection {
+        EventSelection::Previous => provider.find_global_eclipse(
+            search.kind,
+            search.reference,
+            EclipseSearchDirection::Backward,
+        )?,
+        EventSelection::Next => provider.find_global_eclipse(
+            search.kind,
+            search.reference,
+            EclipseSearchDirection::Forward,
+        )?,
+        EventSelection::Nearest => {
+            let previous = provider.find_global_eclipse(
+                search.kind,
+                search.reference,
+                EclipseSearchDirection::Backward,
+            )?;
+            let next = provider.find_global_eclipse(
+                search.kind,
+                search.reference,
+                EclipseSearchDirection::Forward,
+            )?;
+            let before = (search.reference.as_datetime() - previous.exact_instant().as_datetime())
+                .num_milliseconds()
+                .abs();
+            let after = (next.exact_instant().as_datetime() - search.reference.as_datetime())
+                .num_milliseconds()
+                .abs();
+            if before <= after { previous } else { next }
+        }
+    };
+    validate_eclipse_selection(search, &maximum)?;
+    let request = specification.request(maximum.exact_instant(), location);
+    let result = provider.calculate(&request).map_err(calc)?;
+    let calculation = CalculationArtifact::new(request, result).map_err(calc)?;
+    let chart = DerivedChartArtifact::new(calculation, specification.clone()).map_err(calc)?;
+    GlobalEclipseChartArtifact::build(search, maximum, chart)
+}
+
+impl GlobalEclipseChartArtifact {
+    fn build(
+        search: GlobalEclipseSearch,
+        maximum: GlobalEclipseMaximum,
+        chart: DerivedChartArtifact,
+    ) -> Result<Self, EventError> {
+        GlobalEclipseSearch::new(
+            search.kind,
+            search.reference,
+            search.selection,
+            search.window_days,
+        )?;
+        validate_eclipse_selection(search, &maximum)?;
+        if chart.calculation().request().instant() != maximum.exact_instant() {
+            return Err(EventError::DerivedValueMismatch);
+        }
+        for object in [CelestialObject::Sun, CelestialObject::Moon] {
+            if !chart.calculation().request().objects().contains(&object) {
+                return Err(EventError::MissingObject(object));
+            }
+        }
+        Ok(Self {
+            search,
+            maximum,
+            chart,
+        })
+    }
+    fn from_wire(w: EclipseArtifactWire) -> Result<Self, EventError> {
+        if w.schema_version != SCHEMA_VERSION {
+            return Err(EventError::UnsupportedSchema(w.schema_version));
+        }
+        Self::build(w.search, w.maximum, w.chart)
+    }
+    pub fn maximum(&self) -> &GlobalEclipseMaximum {
+        &self.maximum
+    }
+    pub fn chart(&self) -> &DerivedChartArtifact {
+        &self.chart
+    }
+    pub fn to_json(&self) -> Result<String, EventError> {
+        Ok(serde_json::to_string(self)?)
+    }
+    pub fn from_json(input: &str) -> Result<Self, EventError> {
+        Ok(serde_json::from_str(input)?)
+    }
+    pub fn content_id(&self) -> Result<String, EventError> {
+        Ok(format!(
+            "sha256:{:x}",
+            Sha256::digest(serde_json::to_vec(self)?)
+        ))
+    }
+}
+impl Serialize for GlobalEclipseChartArtifact {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        EclipseArtifactRef {
+            schema_version: SCHEMA_VERSION,
+            search: self.search,
+            maximum: &self.maximum,
+            chart: &self.chart,
+        }
+        .serialize(s)
+    }
+}
+impl<'de> Deserialize<'de> for GlobalEclipseChartArtifact {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        Self::from_wire(EclipseArtifactWire::deserialize(d)?).map_err(serde::de::Error::custom)
+    }
+}
+
+fn validate_eclipse_selection(
+    search: GlobalEclipseSearch,
+    maximum: &GlobalEclipseMaximum,
+) -> Result<(), EventError> {
+    if maximum.kind() != search.kind {
+        return Err(EventError::InvalidEclipseMaximum);
+    }
+    let delta = maximum.exact_instant().as_datetime() - search.reference.as_datetime();
+    let direction_ok = match search.selection {
+        EventSelection::Previous => delta <= Duration::zero(),
+        EventSelection::Next => delta >= Duration::zero(),
+        EventSelection::Nearest => true,
+    };
+    if !direction_ok || delta.num_milliseconds().abs() as f64 > search.window_days * 86_400_000.0 {
+        return Err(EventError::EclipseOutsideSearch);
+    }
+    Ok(())
 }
 
 pub fn solve_event<P: EventPositionProvider + EphemerisAdapter>(

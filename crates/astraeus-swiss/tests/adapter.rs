@@ -1,9 +1,14 @@
 use astraeus_core::{
-    Ayanamsa, CalculationError, CalculationRequest, CelestialObject, EphemerisAdapter,
-    GeographicLocation, HouseSystem, UtcInstant, Zodiac,
+    AspectDefinitions, Ayanamsa, CalculationError, CalculationOptions, CalculationRequest,
+    CelestialObject, EphemerisAdapter, GeographicLocation, HouseSystem, UtcInstant, Zodiac,
 };
-use astraeus_events::{EventCoordinateFrame, EventPositionProvider, EventPositionRequest};
+use astraeus_events::{
+    EclipseClassification, EclipseKind, EclipseSearchDirection, EventCoordinateFrame,
+    EventPositionProvider, EventPositionRequest, EventSelection, GlobalEclipseProvider,
+    GlobalEclipseSearch, solve_global_eclipse,
+};
 use astraeus_fixtures::{GoldenFixture, parse_swetest_output};
+use astraeus_specifications::ChartSpecification;
 use astraeus_swiss::SwissEphemerisAdapter;
 use std::sync::Arc;
 
@@ -182,6 +187,92 @@ fn event_sampling_is_house_independent_and_supports_birth_epoch_ecliptic() {
             > 0.1
     );
     assert_eq!(tropical.provenance().provider(), "Swiss Ephemeris");
+}
+
+#[test]
+fn moshier_finds_known_global_eclipse_maxima_and_casts_event_chart() {
+    let adapter = SwissEphemerisAdapter::moshier();
+    let solar = adapter
+        .find_global_eclipse(
+            EclipseKind::Solar,
+            UtcInstant::parse_rfc3339("2024-01-01T00:00:00Z").unwrap(),
+            EclipseSearchDirection::Forward,
+        )
+        .unwrap();
+    let expected_solar = UtcInstant::parse_rfc3339("2024-04-08T18:17:00Z").unwrap();
+    assert!(
+        (solar.exact_instant().as_datetime() - expected_solar.as_datetime())
+            .num_seconds()
+            .abs()
+            < 180
+    );
+    assert!(
+        solar
+            .classifications()
+            .contains(&EclipseClassification::Total)
+    );
+
+    let lunar = adapter
+        .find_global_eclipse(
+            EclipseKind::Lunar,
+            UtcInstant::parse_rfc3339("2022-01-01T00:00:00Z").unwrap(),
+            EclipseSearchDirection::Forward,
+        )
+        .unwrap();
+    let expected_lunar = UtcInstant::parse_rfc3339("2022-05-16T04:11:00Z").unwrap();
+    assert!(
+        (lunar.exact_instant().as_datetime() - expected_lunar.as_datetime())
+            .num_seconds()
+            .abs()
+            < 180
+    );
+    assert!(
+        lunar
+            .classifications()
+            .contains(&EclipseClassification::Total)
+    );
+
+    let specification = ChartSpecification::new(
+        CalculationOptions::new(
+            vec![CelestialObject::Sun, CelestialObject::Moon],
+            Zodiac::Tropical,
+            None,
+            HouseSystem::WholeSign,
+        )
+        .unwrap(),
+        AspectDefinitions::new(vec![]).unwrap(),
+    );
+    let artifact = solve_global_eclipse(
+        &adapter,
+        &specification,
+        GeographicLocation::new(40.7128, -74.006, 10.0).unwrap(),
+        GlobalEclipseSearch::new(
+            EclipseKind::Solar,
+            UtcInstant::parse_rfc3339("2024-01-01T00:00:00Z").unwrap(),
+            EventSelection::Next,
+            180.0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        artifact.chart().calculation().request().instant(),
+        artifact.maximum().exact_instant()
+    );
+    let json = artifact.to_json().unwrap();
+    assert_eq!(
+        astraeus_events::GlobalEclipseChartArtifact::from_json(&json).unwrap(),
+        artifact
+    );
+    assert!(
+        astraeus_events::GlobalEclipseChartArtifact::from_json(&json.replacen(
+            "\"total\"",
+            "\"partial\"",
+            1
+        ))
+        .is_err()
+    );
+    assert!(artifact.content_id().unwrap().starts_with("sha256:"));
 }
 
 #[test]
