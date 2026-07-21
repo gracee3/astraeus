@@ -12,6 +12,7 @@ pub use adapter::{DeterministicMock, EphemerisAdapter};
 pub use aspects::{Aspect, AspectDefinition, AspectDefinitions, AspectKind, calculate_aspects};
 pub use error::{CalculationError, ValidationError};
 pub use types::{
-    Ayanamsa, CalculationProvenance, CalculationRequest, CalculationResult, CelestialObject,
-    EphemerisSource, GeographicLocation, HouseCusps, HouseSystem, Position, UtcInstant, Zodiac,
+    Ayanamsa, CalculationOptions, CalculationProvenance, CalculationRequest, CalculationResult,
+    CelestialObject, EphemerisSource, GeographicLocation, HouseCusps, HouseSystem, Position,
+    UtcInstant, Zodiac,
 };

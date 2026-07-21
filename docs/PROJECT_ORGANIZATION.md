@@ -13,10 +13,11 @@ Ptolemaic aspect detection. The default workspace builds and tests without
 external ephemeris data; a separately selected suite verifies pinned Swiss
 files without committing them.
 
-Before broader chart features, the current hardening checkpoint covers domain
-deserialization invariants, fixture-source strictness, documentation and MSRV
-CI, dependency/license policy, and a protected Swiss-file release workflow.
-The next proposed feature checkpoint is a versioned chart specification.
+The hardening checkpoint covers domain deserialization invariants,
+fixture-source strictness, documentation and MSRV CI, dependency/license
+policy, and protected ephemeral Swiss-file verification. The chart
+specification checkpoint adds versioned reusable calculation and aspect policy
+without changing calculation artifact schema version 1.
 
 ## Recommendation
 

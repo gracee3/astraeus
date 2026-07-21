@@ -41,6 +41,10 @@ APIs, and future composition applications.
 The core also provides deterministic [aspect detection](docs/ASPECTS.md) over
 validated positions, with explicit per-aspect orbs and canonical pair ordering.
 
+`astraeus-specifications` provides reusable schema-v1
+[chart specifications](docs/CHART_SPECIFICATIONS.md) that combine calculation
+choices and aspect policy without changing calculation artifact schema v1.
+
 ## License
 
 AGPL-3.0-or-later. Swiss Ephemeris has its own dual-license requirements; its

@@ -36,6 +36,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "astraeus-specifications"
+version = "0.1.0"
+dependencies = [
+ "astraeus-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "astraeus-swiss"
 version = "0.1.0"
 dependencies = [
