@@ -1,0 +1,50 @@
+use crate::CelestialObject;
+use thiserror::Error;
+
+/// A malformed domain value, rejected before an ephemeris is invoked.
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+pub enum ValidationError {
+    #[error("{field} must be finite")]
+    NonFinite { field: &'static str },
+    #[error("{field} must be in {minimum}..={maximum}, got {value}")]
+    OutOfRange {
+        field: &'static str,
+        minimum: i32,
+        maximum: i32,
+        value: String,
+    },
+    #[error("at least one celestial object must be requested")]
+    EmptyObjectSet,
+    #[error("celestial objects must not contain duplicates: {0:?}")]
+    DuplicateObject(CelestialObject),
+    #[error("sidereal calculations require an ayanamsa")]
+    MissingAyanamsa,
+    #[error("tropical calculations must not specify an ayanamsa")]
+    UnexpectedAyanamsa,
+    #[error("invalid RFC 3339 timestamp: {0}")]
+    InvalidUtcInstant(String),
+    #[error("house cusps must contain exactly 12 values, got {0}")]
+    InvalidHouseCount(usize),
+}
+
+/// A complete calculation failed; partial results are never successful.
+#[derive(Clone, Debug, Error, PartialEq)]
+pub enum CalculationError {
+    #[error(transparent)]
+    InvalidInput(#[from] ValidationError),
+    #[error("ephemeris data is unavailable: {0}")]
+    DataUnavailable(String),
+    #[error("the provider does not support {0:?}")]
+    UnsupportedObject(CelestialObject),
+    #[error("calculation failed for {object:?}: {message}")]
+    ObjectCalculation {
+        object: CelestialObject,
+        message: String,
+    },
+    #[error("provider returned no position for requested object {0:?}")]
+    MissingObject(CelestialObject),
+    #[error("provider returned an unrequested position for {0:?}")]
+    UnexpectedObject(CelestialObject),
+    #[error("ephemeris provider failed: {0}")]
+    Provider(String),
+}
