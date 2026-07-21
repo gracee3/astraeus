@@ -41,6 +41,17 @@ pub enum ValidationError {
         expected: String,
         actual: String,
     },
+    #[error("signed aspect separation must be finite and in (-180, 180], got {0}")]
+    InvalidSignedAspectSeparation(String),
+    #[error("signed aspect separation does not match unsigned separation")]
+    InconsistentAspectSeparation,
+    #[error("relative longitude speed must be finite, got {0}")]
+    InvalidRelativeSpeed(String),
+    #[error("aspect phase {actual:?} does not match calculated phase {expected:?}")]
+    InconsistentAspectPhase {
+        expected: crate::AspectPhase,
+        actual: crate::AspectPhase,
+    },
 }
 
 /// A complete calculation failed; partial results are never successful.
