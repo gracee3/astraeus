@@ -416,7 +416,9 @@ impl ProgressedChartArtifact {
             wire.angle_policy,
             wire.chart,
         )?;
-        if expected.symbolic_instant != wire.symbolic_instant || expected.points != wire.points {
+        if expected.symbolic_instant != wire.symbolic_instant
+            || !technique_points_match(&expected.points, &wire.points)
+        {
             return Err(TechniqueError::DerivedValueMismatch);
         }
         Ok(expected)
@@ -584,7 +586,7 @@ impl SyntheticChartArtifact {
         let expected = Self::build(wire.method, wire.sources)?;
         if expected.zodiac != wire.zodiac
             || expected.ayanamsa != wire.ayanamsa
-            || expected.points != wire.points
+            || !technique_points_match(&expected.points, &wire.points)
             || !cusps_equal(expected.house_cusps_degrees, wire.house_cusps_degrees)
         {
             return Err(TechniqueError::DerivedValueMismatch);
@@ -845,6 +847,35 @@ fn cusps_equal(a: Option<[f64; 12]>, b: Option<[f64; 12]>) -> bool {
             .iter()
             .zip(b)
             .all(|(a, b)| (a - b).abs() <= VALUE_TOLERANCE),
+        _ => false,
+    }
+}
+
+fn technique_points_match(
+    first: &BTreeMap<ChartPointId, TechniquePointPosition>,
+    second: &BTreeMap<ChartPointId, TechniquePointPosition>,
+) -> bool {
+    first.len() == second.len()
+        && first.iter().all(|(id, first)| {
+            second.get(id).is_some_and(|second| {
+                angular_value_matches(first.longitude_degrees, second.longitude_degrees)
+                    && optional_value_matches(
+                        first.motion_degrees_per_target_day,
+                        second.motion_degrees_per_target_day,
+                    )
+            })
+        })
+}
+
+fn angular_value_matches(first: f64, second: f64) -> bool {
+    let difference = (first - second).abs();
+    difference.min(360.0 - difference) <= VALUE_TOLERANCE
+}
+
+fn optional_value_matches(first: Option<f64>, second: Option<f64>) -> bool {
+    match (first, second) {
+        (None, None) => true,
+        (Some(first), Some(second)) => (first - second).abs() <= VALUE_TOLERANCE,
         _ => false,
     }
 }

@@ -192,7 +192,7 @@ impl WesternChartArtifact {
             return Err(WesternArtifactError::UnsupportedSchema(wire.schema_version));
         }
         let artifact = Self::new(wire.chart, wire.policy);
-        if artifact.annotations != wire.annotations {
+        if !annotations_match(&artifact.annotations, &wire.annotations) {
             return Err(WesternArtifactError::AnnotationMismatch);
         }
         Ok(artifact)
@@ -255,12 +255,52 @@ impl<'de> Deserialize<'de> for WesternChartArtifact {
             )));
         }
         let artifact = Self::new(wire.chart, wire.policy);
-        if artifact.annotations != wire.annotations {
+        if !annotations_match(&artifact.annotations, &wire.annotations) {
             return Err(serde::de::Error::custom(
                 "serialized Western annotations do not match the selected policy",
             ));
         }
         Ok(artifact)
+    }
+}
+
+fn annotations_match(first: &[WesternPointAnnotation], second: &[WesternPointAnnotation]) -> bool {
+    first.len() == second.len()
+        && first.iter().zip(second).all(|(first, second)| {
+            first.point == second.point
+                && first.sign.sign() == second.sign.sign()
+                && (first.sign.degrees_within_sign() - second.sign.degrees_within_sign()).abs()
+                    <= 1e-12
+                && first.element == second.element
+                && first.modality == second.modality
+                && first.polarity == second.polarity
+                && first.sign_rulers == second.sign_rulers
+                && first.decan_index == second.decan_index
+                && first.decan_ruler == second.decan_ruler
+                && dignities_match(&first.dignities, &second.dignities)
+        })
+}
+
+fn dignities_match(first: &[DignityCondition], second: &[DignityCondition]) -> bool {
+    first.len() == second.len()
+        && first.iter().zip(second).all(|(first, second)| {
+            first.kind == second.kind
+                && optional_float_matches(
+                    first.exact_longitude_degrees,
+                    second.exact_longitude_degrees,
+                )
+                && optional_float_matches(
+                    first.distance_from_exact_degrees,
+                    second.distance_from_exact_degrees,
+                )
+        })
+}
+
+fn optional_float_matches(first: Option<f64>, second: Option<f64>) -> bool {
+    match (first, second) {
+        (None, None) => true,
+        (Some(first), Some(second)) => (first - second).abs() <= 1e-12,
+        _ => false,
     }
 }
 

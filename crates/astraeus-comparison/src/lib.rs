@@ -325,7 +325,7 @@ impl ComparisonArtifact {
             ));
         }
         let artifact = Self::new(wire.first, wire.second, wire.specification)?;
-        if artifact.aspects != wire.aspects {
+        if !inter_aspects_match(&artifact.aspects, &wire.aspects) {
             return Err(ComparisonArtifactError::AspectMismatch);
         }
         Ok(artifact)
@@ -391,7 +391,7 @@ impl<'de> Deserialize<'de> for ComparisonArtifact {
         let serialized_aspects = wire.aspects;
         let artifact = Self::new(wire.first, wire.second, wire.specification)
             .map_err(serde::de::Error::custom)?;
-        if artifact.aspects != serialized_aspects {
+        if !inter_aspects_match(&artifact.aspects, &serialized_aspects) {
             return Err(serde::de::Error::custom(
                 "serialized inter-chart aspects do not match the charts and policy",
             ));
@@ -515,4 +515,26 @@ fn classify_phase(signed_separation: f64, kind: AspectKind, relative_speed: f64)
     } else {
         AspectPhase::Separating
     }
+}
+
+fn inter_aspects_match(first: &[InterChartAspect], second: &[InterChartAspect]) -> bool {
+    first.len() == second.len()
+        && first.iter().zip(second).all(|(first, second)| {
+            first.first == second.first
+                && first.second == second.second
+                && first.kind == second.kind
+                && first.phase == second.phase
+                && (first.separation_degrees - second.separation_degrees).abs() <= 1e-12
+                && (first.signed_separation_degrees - second.signed_separation_degrees).abs()
+                    <= 1e-12
+                && (first.orb_degrees - second.orb_degrees).abs() <= 1e-12
+                && match (
+                    first.relative_speed_degrees_per_day,
+                    second.relative_speed_degrees_per_day,
+                ) {
+                    (None, None) => true,
+                    (Some(first), Some(second)) => (first - second).abs() <= 1e-12,
+                    _ => false,
+                }
+        })
 }

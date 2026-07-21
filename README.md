@@ -63,8 +63,12 @@ techniques](docs/TECHNIQUES.md): progressions, direct solar arcs, harmonics,
 midpoint composites, and Davison charts.
 
 `astraeus-events` provides [exact event solving](docs/EVENTS.md) for returns,
-lunations, ingresses, and seasonal points, producing ordinary charts at the
-resolved instant.
+lunations, ingresses, seasonal points, and global eclipse maxima, producing
+ordinary charts at the resolved instant.
+
+The completed Western milestone is summarized in the [engine requirements
+status](docs/ENGINE_REQUIREMENTS.md), including explicit Oracle Studio and
+licensing boundaries.
 
 ## License
 
