@@ -31,6 +31,16 @@ pub enum ValidationError {
     InvalidAspectOrb(String),
     #[error("aspect definitions must not contain duplicates: {0:?}")]
     DuplicateAspect(crate::AspectKind),
+    #[error("aspect objects must be distinct and canonically ordered")]
+    InvalidAspectPair,
+    #[error("aspect separation must be finite and in 0..=180 degrees, got {0}")]
+    InvalidAspectSeparation(String),
+    #[error("aspect orb {actual} does not match the {kind:?} separation; expected {expected}")]
+    InconsistentAspectOrb {
+        kind: crate::AspectKind,
+        expected: String,
+        actual: String,
+    },
 }
 
 /// A complete calculation failed; partial results are never successful.

@@ -1,7 +1,22 @@
 # Project Organization and Legacy Source Plan
 
-Status: proposed cross-project boundary
+Status: first Astraeus validation checkpoint complete
 Last reviewed: 2026-07-21
+
+## Implementation status
+
+The first Track B checkpoint is complete on `main`. Astraeus now has validated
+core contracts, a deterministic mock, versioned golden fixtures, tropical and
+Lahiri sidereal reference coverage, a serialized Swiss Ephemeris adapter,
+explicit provenance, stable content-addressed artifacts, and deterministic
+Ptolemaic aspect detection. The default workspace builds and tests without
+external ephemeris data; a separately selected suite verifies pinned Swiss
+files without committing them.
+
+Before broader chart features, the current hardening checkpoint covers domain
+deserialization invariants, fixture-source strictness, documentation and MSRV
+CI, dependency/license policy, and a protected Swiss-file release workflow.
+The next proposed feature checkpoint is a versioned chart specification.
 
 ## Recommendation
 

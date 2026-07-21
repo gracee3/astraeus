@@ -76,3 +76,9 @@ ASTRAEUS_SWISS_EPHEMERIS_PATH=/path/to/pinned-ephe \
   cargo test -p astraeus-swiss --test adapter -- --ignored --exact \
   swiss_files_match_tropical_and_sidereal_references
 ```
+
+The manual `Swiss file verification` GitHub workflow runs the same command on
+a self-hosted runner labeled `astraeus-swiss`. The protected
+`swiss-ephemeris-verification` environment must define the
+`ASTRAEUS_SWISS_EPHEMERIS_PATH` variable, pointing to runner-local pinned data.
+Ordinary hosted CI never receives or caches the licensed ephemeris files.

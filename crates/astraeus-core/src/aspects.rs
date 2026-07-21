@@ -52,6 +52,7 @@ impl AspectDefinition {
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct AspectDefinitionWire {
     kind: AspectKind,
     orb_degrees: f64,
@@ -114,7 +115,7 @@ impl<'de> Deserialize<'de> for AspectDefinitions {
 }
 
 /// A detected aspect. Objects are always ordered by [`CelestialObject`].
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct Aspect {
     first: CelestialObject,
     second: CelestialObject,
@@ -124,6 +125,38 @@ pub struct Aspect {
 }
 
 impl Aspect {
+    fn new(
+        first: CelestialObject,
+        second: CelestialObject,
+        kind: AspectKind,
+        separation_degrees: f64,
+        orb_degrees: f64,
+    ) -> Result<Self, ValidationError> {
+        if first >= second {
+            return Err(ValidationError::InvalidAspectPair);
+        }
+        if !separation_degrees.is_finite() || !(0.0..=180.0).contains(&separation_degrees) {
+            return Err(ValidationError::InvalidAspectSeparation(
+                separation_degrees.to_string(),
+            ));
+        }
+        let expected_orb = (separation_degrees - kind.angle_degrees()).abs();
+        if !orb_degrees.is_finite() || (orb_degrees - expected_orb).abs() > 1e-12 {
+            return Err(ValidationError::InconsistentAspectOrb {
+                kind,
+                expected: expected_orb.to_string(),
+                actual: orb_degrees.to_string(),
+            });
+        }
+        Ok(Self {
+            first,
+            second,
+            kind,
+            separation_degrees,
+            orb_degrees,
+        })
+    }
+
     pub fn first(self) -> CelestialObject {
         self.first
     }
@@ -139,6 +172,33 @@ impl Aspect {
     /// Absolute distance from the aspect's exact angle.
     pub fn orb_degrees(self) -> f64 {
         self.orb_degrees
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AspectWire {
+    first: CelestialObject,
+    second: CelestialObject,
+    kind: AspectKind,
+    separation_degrees: f64,
+    orb_degrees: f64,
+}
+
+impl<'de> Deserialize<'de> for Aspect {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = AspectWire::deserialize(deserializer)?;
+        Self::new(
+            wire.first,
+            wire.second,
+            wire.kind,
+            wire.separation_degrees,
+            wire.orb_degrees,
+        )
+        .map_err(serde::de::Error::custom)
     }
 }
 

@@ -8,10 +8,10 @@ rust-version.workspace = true
 description = "Swiss Ephemeris adapter for Astraeus"
 
 [dependencies]
-astraeus-core = { path = "../astraeus-core" }
+astraeus-core = { version = "0.1.0", path = "../astraeus-core" }
 chrono.workspace = true
 sweph-sys.workspace = true
 
 [dev-dependencies]
-astraeus-fixtures = { path = "../astraeus-fixtures" }
+astraeus-fixtures = { version = "0.1.0", path = "../astraeus-fixtures" }
 tempfile = "3.20.0"

@@ -1,12 +1,35 @@
 use std::collections::BTreeMap;
 
 use astraeus_core::{
-    AspectDefinition, AspectDefinitions, AspectKind, CelestialObject, Position, ValidationError,
-    calculate_aspects,
+    Aspect, AspectDefinition, AspectDefinitions, AspectKind, CelestialObject, Position,
+    ValidationError, calculate_aspects,
 };
 
 fn position(longitude: f64) -> Position {
     Position::new(longitude, 0.0, 1.0, 0.0).unwrap()
+}
+
+#[test]
+fn detects_every_ptolemaic_aspect_at_exactitude() {
+    for (kind, longitude) in [
+        (AspectKind::Conjunction, 0.0),
+        (AspectKind::Sextile, 60.0),
+        (AspectKind::Square, 90.0),
+        (AspectKind::Trine, 120.0),
+        (AspectKind::Opposition, 180.0),
+    ] {
+        let positions = BTreeMap::from([
+            (CelestialObject::Sun, position(0.0)),
+            (CelestialObject::Moon, position(longitude)),
+        ]);
+        let definitions =
+            AspectDefinitions::new(vec![AspectDefinition::new(kind, 0.0).unwrap()]).unwrap();
+        let aspects = calculate_aspects(&positions, &definitions);
+        assert_eq!(aspects.len(), 1);
+        assert_eq!(aspects[0].kind(), kind);
+        assert_eq!(aspects[0].separation_degrees(), longitude);
+        assert_eq!(aspects[0].orb_degrees(), 0.0);
+    }
 }
 
 #[test]
@@ -49,6 +72,62 @@ fn closest_aspect_wins_when_windows_overlap() {
 }
 
 #[test]
+fn definition_order_does_not_change_tie_breaking() {
+    let positions = BTreeMap::from([
+        (CelestialObject::Sun, position(0.0)),
+        (CelestialObject::Moon, position(75.0)),
+    ]);
+    for kinds in [
+        [AspectKind::Sextile, AspectKind::Square],
+        [AspectKind::Square, AspectKind::Sextile],
+    ] {
+        let definitions = AspectDefinitions::new(
+            kinds
+                .into_iter()
+                .map(|kind| AspectDefinition::new(kind, 15.0).unwrap())
+                .collect(),
+        )
+        .unwrap();
+        assert_eq!(
+            calculate_aspects(&positions, &definitions)[0].kind(),
+            AspectKind::Sextile
+        );
+    }
+}
+
+#[test]
+fn no_match_is_empty_and_multiple_pairs_are_canonically_ordered() {
+    let definitions = AspectDefinitions::new(vec![
+        AspectDefinition::new(AspectKind::Conjunction, 1.0).unwrap(),
+    ])
+    .unwrap();
+    let no_match = BTreeMap::from([
+        (CelestialObject::Sun, position(0.0)),
+        (CelestialObject::Moon, position(10.0)),
+    ]);
+    assert!(calculate_aspects(&no_match, &definitions).is_empty());
+
+    let positions = BTreeMap::from([
+        (CelestialObject::Mars, position(0.0)),
+        (CelestialObject::Sun, position(0.0)),
+        (CelestialObject::Moon, position(0.0)),
+    ]);
+    let aspects = calculate_aspects(&positions, &definitions);
+    assert_eq!(aspects.len(), 3);
+    assert_eq!(
+        aspects
+            .iter()
+            .map(|aspect| (aspect.first(), aspect.second()))
+            .collect::<Vec<_>>(),
+        vec![
+            (CelestialObject::Sun, CelestialObject::Moon),
+            (CelestialObject::Sun, CelestialObject::Mars),
+            (CelestialObject::Moon, CelestialObject::Mars),
+        ]
+    );
+}
+
+#[test]
 fn definitions_reject_invalid_orbs_and_duplicates() {
     assert!(matches!(
         AspectDefinition::new(AspectKind::Trine, f64::NAN),
@@ -73,4 +152,13 @@ fn json_cannot_bypass_definition_validation() {
         )
         .is_err()
     );
+
+    for invalid in [
+        r#"{"first":"moon","second":"sun","kind":"square","separation_degrees":90.0,"orb_degrees":0.0}"#,
+        r#"{"first":"sun","second":"moon","kind":"square","separation_degrees":181.0,"orb_degrees":91.0}"#,
+        r#"{"first":"sun","second":"moon","kind":"square","separation_degrees":91.0,"orb_degrees":2.0}"#,
+        r#"{"first":"sun","second":"moon","kind":"square","separation_degrees":90.0,"orb_degrees":0.0,"extra":true}"#,
+    ] {
+        assert!(serde_json::from_str::<Aspect>(invalid).is_err());
+    }
 }
