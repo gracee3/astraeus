@@ -63,3 +63,16 @@ The format uses schema version 1 and rejects unknown top-level and expected
 fields. Angular and speed tolerance is `1e-6` degrees (or degrees/day), and
 distance tolerance is `1e-9` AU. Longitude and house comparisons account for
 wrap-around at 0°/360°.
+
+## Swiss-file suite
+
+The two `j2000-greenwich-swiss-*.stdout` fixtures exercise Sun, Moon, Chiron,
+houses, speed, and tropical/Lahiri sidereal configuration with `-eswe`.
+`SWISS_PROVENANCE.md` records the immutable data revision and hashes. Run the
+selected adapter suite without copying data into the repository:
+
+```text
+ASTRAEUS_SWISS_EPHEMERIS_PATH=/path/to/pinned-ephe \
+  cargo test -p astraeus-swiss --test adapter -- --ignored --exact \
+  swiss_files_match_tropical_and_sidereal_references
+```
