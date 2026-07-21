@@ -95,6 +95,7 @@ dependencies = [
  "astraeus-core",
  "astraeus-events",
  "astraeus-fixtures",
+ "astraeus-specifications",
  "chrono",
  "sweph-sys",
  "tempfile",

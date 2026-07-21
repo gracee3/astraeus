@@ -14,8 +14,9 @@ use astraeus_core::{
     HouseSystem, Position, Zodiac,
 };
 use astraeus_events::{
-    EventCoordinateFrame, EventError, EventPositionProvider, EventPositionRequest,
-    EventPositionSample,
+    EclipseClassification, EclipseKind, EclipseSearchDirection, EventCoordinateFrame, EventError,
+    EventPositionProvider, EventPositionRequest, EventPositionSample, GlobalEclipseMaximum,
+    GlobalEclipseProvider,
 };
 use chrono::{Datelike, Timelike};
 use sweph_sys as sys;
@@ -309,6 +310,60 @@ impl EventPositionProvider for SwissEphemerisAdapter {
     }
 }
 
+impl GlobalEclipseProvider for SwissEphemerisAdapter {
+    fn find_global_eclipse(
+        &self,
+        kind: EclipseKind,
+        reference: astraeus_core::UtcInstant,
+        direction: EclipseSearchDirection,
+    ) -> Result<GlobalEclipseMaximum, EventError> {
+        let _guard = SWISS_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let source_flag = self.source_flag_locked().map_err(event_error)?;
+        let start_jd = julian_day(reference);
+        self.verify_eclipse_sources_locked(start_jd, source_flag)?;
+        let mut times = [0.0; 10];
+        let mut error = [0 as c_char; sys::SE_MAX_STNAME];
+        let backward = i32::from(direction == EclipseSearchDirection::Backward);
+        // SAFETY: buffers have the sizes required by the native API and the
+        // process-wide Swiss lock is held.
+        let flags = unsafe {
+            match kind {
+                EclipseKind::Solar => sys::swe_sol_eclipse_when_glob(
+                    start_jd,
+                    source_flag,
+                    0,
+                    times.as_mut_ptr(),
+                    backward,
+                    error.as_mut_ptr(),
+                ),
+                EclipseKind::Lunar => sys::swe_lun_eclipse_when(
+                    start_jd,
+                    source_flag,
+                    0,
+                    times.as_mut_ptr(),
+                    backward,
+                    error.as_mut_ptr(),
+                ),
+            }
+        };
+        if flags <= 0 {
+            return Err(EventError::Provider(error_message(&error)));
+        }
+        let exact = utc_from_julian_day(times[0])?;
+        let residual_seconds = (julian_day(exact) - times[0]).abs() * 86_400.0;
+        GlobalEclipseMaximum::new(
+            kind,
+            exact,
+            eclipse_classifications(flags),
+            flags,
+            residual_seconds,
+            self.provenance_locked().map_err(event_error)?,
+        )
+    }
+}
+
 impl SwissEphemerisAdapter {
     fn source_flag_locked(&self) -> Result<i32, CalculationError> {
         match &self.mode {
@@ -334,6 +389,34 @@ impl SwissEphemerisAdapter {
             self.data_revision.clone(),
         )?)
     }
+
+    fn verify_eclipse_sources_locked(&self, jd: f64, source_flag: i32) -> Result<(), EventError> {
+        for object in [CelestialObject::Sun, CelestialObject::Moon] {
+            let mut output = [0.0; 6];
+            let mut error = [0 as c_char; sys::SE_MAX_STNAME];
+            // SAFETY: buffers satisfy the native API and the lock is held.
+            let returned = unsafe {
+                sys::swe_calc_ut(
+                    jd,
+                    object_code(object),
+                    source_flag,
+                    output.as_mut_ptr(),
+                    error.as_mut_ptr(),
+                )
+            };
+            if returned < 0 {
+                return Err(EventError::Provider(error_message(&error)));
+            }
+            if returned & sys::SEFLG_EPHMASK != source_flag {
+                return Err(EventError::Provider(format!(
+                    "requested {}, but Swiss Ephemeris returned {} for {object:?}",
+                    source_name(source_flag),
+                    source_name(returned & sys::SEFLG_EPHMASK)
+                )));
+            }
+        }
+        Ok(())
+    }
 }
 
 fn julian_day(instant: astraeus_core::UtcInstant) -> f64 {
@@ -355,6 +438,39 @@ fn julian_day(instant: astraeus_core::UtcInstant) -> f64 {
 
 fn event_error(error: impl ToString) -> EventError {
     EventError::Provider(error.to_string())
+}
+
+fn utc_from_julian_day(jd: f64) -> Result<astraeus_core::UtcInstant, EventError> {
+    const UNIX_EPOCH_JD: f64 = 2_440_587.5;
+    let milliseconds = ((jd - UNIX_EPOCH_JD) * 86_400_000.0).round();
+    if !milliseconds.is_finite() || milliseconds < i64::MIN as f64 || milliseconds > i64::MAX as f64
+    {
+        return Err(EventError::Time("Julian day is outside UTC range".into()));
+    }
+    let datetime = chrono::DateTime::from_timestamp_millis(milliseconds as i64)
+        .ok_or_else(|| EventError::Time("Julian day is outside UTC range".into()))?;
+    astraeus_core::UtcInstant::parse_rfc3339(
+        &datetime.to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+    )
+    .map_err(event_error)
+}
+
+fn eclipse_classifications(flags: i32) -> Vec<EclipseClassification> {
+    let mut values = Vec::new();
+    for (flag, classification) in [
+        (sys::SE_ECL_CENTRAL, EclipseClassification::Central),
+        (sys::SE_ECL_NONCENTRAL, EclipseClassification::Noncentral),
+        (sys::SE_ECL_TOTAL, EclipseClassification::Total),
+        (sys::SE_ECL_ANNULAR, EclipseClassification::Annular),
+        (sys::SE_ECL_PARTIAL, EclipseClassification::Partial),
+        (sys::SE_ECL_ANNULAR_TOTAL, EclipseClassification::Hybrid),
+        (sys::SE_ECL_PENUMBRAL, EclipseClassification::Penumbral),
+    ] {
+        if flags & flag != 0 {
+            values.push(classification);
+        }
+    }
+    values
 }
 
 fn path_to_c_string(path: &Path) -> Result<CString, CalculationError> {
