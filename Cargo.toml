@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/astraeus-core", "crates/astraeus-fixtures"]
+members = ["crates/astraeus-core", "crates/astraeus-fixtures", "crates/astraeus-swiss"]
 resolver = "3"
 
 [workspace.package]
@@ -13,4 +13,5 @@ chrono = { version = "0.4.41", default-features = false, features = ["serde", "s
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 sha2 = "0.10.9"
+sweph-sys = "=0.3.0"
 thiserror = "2.0.12"

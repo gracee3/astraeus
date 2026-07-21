@@ -26,6 +26,10 @@ The calculation contract lives in `astraeus-core`. The non-published
 adding a native ephemeris dependency. See [validation fixtures](docs/VALIDATION.md)
 and the [Swiss Ephemeris integration policy](docs/SWISS_EPHEMERIS.md).
 
+`astraeus-swiss` implements the provider contract with explicit Moshier and
+Swiss-file modes. Swiss-file mode requires a caller-supplied data directory
+and rejects silent fallback; no ephemeris data is bundled.
+
 ## License
 
 AGPL-3.0-or-later. Swiss Ephemeris has its own dual-license requirements; its

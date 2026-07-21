@@ -1,7 +1,8 @@
 # Swiss Ephemeris integration policy
 
-No Swiss Ephemeris library, executable, model, or `.se1` data file is included
-in Astraeus at this checkpoint.
+The `astraeus-swiss` crate uses the exactly pinned `sweph-sys` 0.3.0 raw
+binding, which vendors Swiss Ephemeris C source. No executable or `.se1` data
+file is committed.
 
 ## Licensing
 
@@ -35,6 +36,8 @@ ephemeris path and sidereal mode. The first native adapter must therefore:
 6. keep all native calls, including cleanup, inside the same synchronization
    boundary.
 
-Process isolation may replace the lock later, but concurrent unsynchronized
-access is not permitted. A native dependency is added only after dedicated
-Swiss-file fixtures and contract tests are ready.
+The adapter implements this policy with one outer lock across configuration,
+all requested objects, fallback checks, and houses. Applications must not call
+`sweph-sys` directly in the same process because that would bypass the lock.
+Swiss mode rejects any returned Moshier source flag. Moshier mode is explicit
+and rejects Chiron because it requires external data.
