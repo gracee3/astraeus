@@ -169,10 +169,31 @@ fn result_rejects_unrequested_provider_output() {
         ),
     ]);
 
+    let provenance =
+        CalculationProvenance::new("test", "1", EphemerisSource::Synthetic, None).unwrap();
     assert_eq!(
-        CalculationResult::new(&request, positions, houses()).unwrap_err(),
+        CalculationResult::new(&request, positions, houses(), provenance).unwrap_err(),
         CalculationError::UnexpectedObject(CelestialObject::Moon)
     );
+}
+
+#[test]
+fn provenance_rejects_empty_identity_fields() {
+    assert_eq!(
+        CalculationProvenance::new(" ", "1", EphemerisSource::Synthetic, None).unwrap_err(),
+        ValidationError::EmptyText { field: "provider" }
+    );
+}
+
+#[test]
+fn provenance_json_cannot_bypass_validation() {
+    let invalid = r#"{
+        "provider": "",
+        "provider_version": "1",
+        "ephemeris_source": "synthetic",
+        "data_revision": null
+    }"#;
+    assert!(serde_json::from_str::<CalculationProvenance>(invalid).is_err());
 }
 
 #[test]

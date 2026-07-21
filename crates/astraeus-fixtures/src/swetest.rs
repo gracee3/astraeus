@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
 use astraeus_core::{
-    CalculationError, CalculationRequest, CalculationResult, CelestialObject, HouseCusps, Position,
+    CalculationError, CalculationProvenance, CalculationRequest, CalculationResult,
+    CelestialObject, EphemerisSource, HouseCusps, Position,
 };
 use chrono::{Datelike, Timelike};
 use thiserror::Error;
@@ -157,7 +158,11 @@ pub fn parse_swetest_output(
         ascendant.ok_or(SwetestParseError::MissingAscendant)?,
         midheaven.ok_or(SwetestParseError::MissingMidheaven)?,
     )?;
-    Ok(CalculationResult::new(request, positions, houses)?)
+    let provenance =
+        CalculationProvenance::new("swetest", "unknown", EphemerisSource::Synthetic, None)?;
+    Ok(CalculationResult::new(
+        request, positions, houses, provenance,
+    )?)
 }
 
 fn object_from_name(name: &str) -> Option<CelestialObject> {

@@ -30,6 +30,10 @@ and the [Swiss Ephemeris integration policy](docs/SWISS_EPHEMERIS.md).
 Swiss-file modes. Swiss-file mode requires a caller-supplied data directory
 and rejects silent fallback; no ephemeris data is bundled.
 
+Every successful result includes validated [calculation provenance](docs/PROVENANCE.md)
+covering its provider, runtime version, ephemeris source, and optional pinned
+data revision.
+
 ## License
 
 AGPL-3.0-or-later. Swiss Ephemeris has its own dual-license requirements; its

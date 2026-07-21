@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
 
-use astraeus_core::{CalculationRequest, CalculationResult, CelestialObject, Position};
+use astraeus_core::{
+    CalculationProvenance, CalculationRequest, CalculationResult, CelestialObject, EphemerisSource,
+    Position,
+};
 use astraeus_fixtures::{FixtureError, FixtureMismatch, GoldenFixture, parse_swetest_output};
 
 const ROOT: &str = concat!(
@@ -78,6 +81,7 @@ fn comparison_reports_numeric_and_object_mismatches_together() {
         &alternate_request,
         positions,
         fixture.expected().houses().clone(),
+        CalculationProvenance::new("test", "1", EphemerisSource::Synthetic, None).unwrap(),
     )
     .unwrap();
     let error = fixture.compare(&changed).unwrap_err();

@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    CalculationError, CalculationRequest, CalculationResult, CelestialObject, HouseCusps, Position,
+    CalculationError, CalculationProvenance, CalculationRequest, CalculationResult,
+    CelestialObject, EphemerisSource, HouseCusps, Position,
 };
 
 /// Provider boundary for complete chart calculations.
@@ -39,6 +40,12 @@ impl EphemerisAdapter for DeterministicMock {
                 .ok_or(CalculationError::MissingObject(*object))?;
             positions.insert(*object, position);
         }
-        CalculationResult::new(request, positions, self.houses.clone())
+        let provenance = CalculationProvenance::new(
+            "deterministic_mock",
+            env!("CARGO_PKG_VERSION"),
+            EphemerisSource::Synthetic,
+            None,
+        )?;
+        CalculationResult::new(request, positions, self.houses.clone(), provenance)
     }
 }
