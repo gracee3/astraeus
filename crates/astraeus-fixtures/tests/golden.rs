@@ -52,6 +52,17 @@ fn unsupported_schema_is_rejected() {
 }
 
 #[test]
+fn unknown_fixture_engine_is_rejected() {
+    let json = std::fs::read_to_string(format!("{ROOT}/j2000-greenwich-tropical-placidus.json"))
+        .unwrap()
+        .replacen(r#""engine": "moshier""#, r#""engine": "mosheir""#, 1);
+    assert!(matches!(
+        GoldenFixture::from_json(&json),
+        Err(FixtureError::UnsupportedEngine(engine)) if engine == "mosheir"
+    ));
+}
+
+#[test]
 fn comparison_reports_numeric_and_object_mismatches_together() {
     let (fixture, _) = load("j2000-greenwich-tropical-placidus");
     let mut objects = fixture.request().objects().to_vec();

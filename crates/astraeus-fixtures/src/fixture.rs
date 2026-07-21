@@ -74,6 +74,8 @@ pub enum FixtureError {
     InvalidSha256 { field: &'static str },
     #[error("fixture tolerance {0} must be finite and non-negative")]
     InvalidTolerance(&'static str),
+    #[error("unsupported fixture engine {0}")]
+    UnsupportedEngine(String),
     #[error(transparent)]
     InvalidExpected(#[from] astraeus_core::CalculationError),
     #[error("raw output SHA-256 mismatch: expected {expected}, got {actual}")]
@@ -92,7 +94,7 @@ impl GoldenFixture {
         let ephemeris_source = match wire.source.engine.as_str() {
             "moshier" => EphemerisSource::Moshier,
             "swiss_files" => EphemerisSource::SwissFiles,
-            _ => EphemerisSource::Synthetic,
+            engine => return Err(FixtureError::UnsupportedEngine(engine.to_owned())),
         };
         let provenance = CalculationProvenance::new(
             wire.source.tool.clone(),

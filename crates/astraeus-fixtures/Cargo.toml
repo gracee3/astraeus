@@ -9,7 +9,7 @@ description = "Golden fixture schema and comparison harness for Astraeus"
 publish = false
 
 [dependencies]
-astraeus-core = { path = "../astraeus-core" }
+astraeus-core = { version = "0.1.0", path = "../astraeus-core" }
 chrono.workspace = true
 serde.workspace = true
 serde_json.workspace = true
