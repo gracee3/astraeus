@@ -1,13 +1,16 @@
 use std::collections::BTreeMap;
 
+use astraeus_artifacts::CalculationArtifact;
 use astraeus_core::{
     AngularPosition, AspectDefinitions, CalculationError, CalculationOptions,
     CalculationProvenance, CalculationRequest, CalculationResult, CelestialObject, ChartAngles,
     EphemerisAdapter, EphemerisSource, GeographicLocation, HouseCusps, HouseSystem, Position,
     UtcInstant, Zodiac,
 };
+use astraeus_derived::DerivedChartArtifact;
 use astraeus_events::{
-    EventDefinition, EventSearch, EventSelection, ReturnFrame, SeasonalPoint, solve_event,
+    EventDefinition, EventPositionProvider, EventPositionRequest, EventPositionSample, EventSearch,
+    EventSelection, ReturnFrame, SeasonalPoint, solve_event, solve_return,
 };
 use astraeus_specifications::ChartSpecification;
 
@@ -53,6 +56,34 @@ impl EphemerisAdapter for LinearAdapter {
     }
 }
 
+impl EventPositionProvider for LinearAdapter {
+    fn sample_event_positions(
+        &self,
+        request: &EventPositionRequest,
+    ) -> Result<EventPositionSample, astraeus_events::EventError> {
+        let epoch = UtcInstant::parse_rfc3339("2000-01-01T00:00:00Z").unwrap();
+        let days = (request.instant().as_datetime() - epoch.as_datetime()).num_milliseconds()
+            as f64
+            / 86_400_000.0;
+        let positions = request
+            .objects()
+            .iter()
+            .map(|object| {
+                let (longitude, speed) = match object {
+                    CelestialObject::Moon => ((13.0 * days).rem_euclid(360.0), 13.0),
+                    _ => (days.rem_euclid(360.0), 1.0),
+                };
+                (*object, AngularPosition::new(longitude, speed).unwrap())
+            })
+            .collect();
+        EventPositionSample::new(
+            request.clone(),
+            positions,
+            CalculationProvenance::new("linear", "1", EphemerisSource::Synthetic, None).unwrap(),
+        )
+    }
+}
+
 fn specification() -> ChartSpecification {
     ChartSpecification::new(
         CalculationOptions::new(
@@ -66,17 +97,29 @@ fn specification() -> ChartSpecification {
     )
 }
 
+fn natal() -> DerivedChartArtifact {
+    let specification = specification();
+    let request = specification.request(
+        UtcInstant::parse_rfc3339("2000-01-01T00:00:00Z").unwrap(),
+        GeographicLocation::new(0.0, 0.0, 0.0).unwrap(),
+    );
+    let result = LinearAdapter.calculate(&request).unwrap();
+    DerivedChartArtifact::new(
+        CalculationArtifact::new(request, result).unwrap(),
+        specification,
+    )
+    .unwrap()
+}
+
 #[test]
 fn previous_selects_the_latest_prior_root() {
-    let artifact = solve_event(
+    let artifact = solve_return(
         &LinearAdapter,
         &specification(),
         GeographicLocation::new(0.0, 0.0, 0.0).unwrap(),
-        EventDefinition::Return {
-            object: CelestialObject::Sun,
-            target_longitude_degrees: 0.0,
-            frame: ReturnFrame::ConfiguredZodiac,
-        },
+        &natal(),
+        CelestialObject::Sun,
+        ReturnFrame::ConfiguredZodiac,
         EventSearch {
             reference: UtcInstant::parse_rfc3339("2000-06-29T00:00:00Z").unwrap(),
             selection: EventSelection::Previous,
@@ -94,6 +137,14 @@ fn previous_selects_the_latest_prior_root() {
     );
     assert!(artifact.residual_degrees() <= 1e-5);
     assert!(artifact.content_id().unwrap().starts_with("sha256:"));
+    let json = artifact.to_json().unwrap();
+    assert_eq!(
+        astraeus_events::EventChartArtifact::from_json(&json).unwrap(),
+        artifact
+    );
+    let mut tampered: serde_json::Value = serde_json::from_str(&json).unwrap();
+    tampered["target_longitude_degrees"] = serde_json::json!(1.0);
+    assert!(astraeus_events::EventChartArtifact::from_json(&tampered.to_string()).is_err());
 }
 
 #[test]

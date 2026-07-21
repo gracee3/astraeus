@@ -9,6 +9,7 @@ description = "Swiss Ephemeris adapter for Astraeus"
 
 [dependencies]
 astraeus-core = { version = "0.1.0", path = "../astraeus-core" }
+astraeus-events = { version = "0.1.0", path = "../astraeus-events" }
 chrono.workspace = true
 sweph-sys.workspace = true
 

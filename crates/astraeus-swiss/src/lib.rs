@@ -13,6 +13,10 @@ use astraeus_core::{
     CalculationResult, CelestialObject, ChartAngles, EphemerisAdapter, EphemerisSource, HouseCusps,
     HouseSystem, Position, Zodiac,
 };
+use astraeus_events::{
+    EventCoordinateFrame, EventError, EventPositionProvider, EventPositionRequest,
+    EventPositionSample,
+};
 use chrono::{Datelike, Timelike};
 use sweph_sys as sys;
 
@@ -222,6 +226,135 @@ impl EphemerisAdapter for SwissEphemerisAdapter {
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         self.calculate_locked(request)
     }
+}
+
+impl EventPositionProvider for SwissEphemerisAdapter {
+    fn sample_event_positions(
+        &self,
+        request: &EventPositionRequest,
+    ) -> Result<EventPositionSample, EventError> {
+        let _guard = SWISS_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let source_flag = self.source_flag_locked().map_err(event_error)?;
+        let jd = julian_day(request.instant());
+        let frame_flag = match request.frame() {
+            EventCoordinateFrame::Configured { zodiac, ayanamsa } => {
+                if zodiac == Zodiac::Sidereal {
+                    let mode = ayanamsa_code(ayanamsa.ok_or_else(|| {
+                        EventError::Provider("sidereal event frame omitted ayanamsa".into())
+                    })?);
+                    // SAFETY: the validated mode is set while the global lock is held.
+                    unsafe { sys::swe_set_sid_mode(mode, 0.0, 0.0) };
+                    sys::SEFLG_SIDEREAL
+                } else {
+                    0
+                }
+            }
+            EventCoordinateFrame::TropicalOfDate => 0,
+            EventCoordinateFrame::BirthEpochEcliptic { epoch } => {
+                let epoch_ut = julian_day(epoch);
+                // Swiss user mode takes t0 in TT. ECL_T0 fixes the reference
+                // plane to the ecliptic at the birth epoch.
+                let epoch_tt = epoch_ut + unsafe { sys::swe_deltat(epoch_ut) };
+                const SE_SIDM_USER: i32 = 255;
+                const SE_SIDBIT_ECL_T0: i32 = 256;
+                // SAFETY: numeric constants come from the vendored 2.10.03 header;
+                // the global adapter lock is held.
+                unsafe { sys::swe_set_sid_mode(SE_SIDM_USER | SE_SIDBIT_ECL_T0, epoch_tt, 0.0) };
+                sys::SEFLG_SIDEREAL
+            }
+        };
+        let flags = source_flag | frame_flag | sys::SEFLG_SPEED;
+        let mut positions = BTreeMap::new();
+        for object in request.objects() {
+            if self.mode == EphemerisMode::Moshier && *object == CelestialObject::Chiron {
+                return Err(EventError::Provider(
+                    CalculationError::UnsupportedObject(*object).to_string(),
+                ));
+            }
+            let mut output = [0.0; 6];
+            let mut error = [0 as c_char; sys::SE_MAX_STNAME];
+            // SAFETY: buffers satisfy the native API and the global lock is held.
+            let returned = unsafe {
+                sys::swe_calc_ut(
+                    jd,
+                    object_code(*object),
+                    flags,
+                    output.as_mut_ptr(),
+                    error.as_mut_ptr(),
+                )
+            };
+            if returned < 0 {
+                return Err(EventError::Provider(error_message(&error)));
+            }
+            let actual_source = returned & sys::SEFLG_EPHMASK;
+            if actual_source != source_flag {
+                return Err(EventError::Provider(format!(
+                    "requested {}, but Swiss Ephemeris returned {} for {object:?}",
+                    source_name(source_flag),
+                    source_name(actual_source)
+                )));
+            }
+            positions.insert(
+                *object,
+                AngularPosition::new(output[0], output[3]).map_err(event_error)?,
+            );
+        }
+        EventPositionSample::new(
+            request.clone(),
+            positions,
+            self.provenance_locked().map_err(event_error)?,
+        )
+    }
+}
+
+impl SwissEphemerisAdapter {
+    fn source_flag_locked(&self) -> Result<i32, CalculationError> {
+        match &self.mode {
+            EphemerisMode::Moshier => Ok(sys::SEFLG_MOSEPH),
+            EphemerisMode::SwissFiles(path) => {
+                let path = path_to_c_string(path)?;
+                // SAFETY: the CString remains alive for the call; lock is held.
+                unsafe { sys::swe_set_ephe_path(path.as_ptr()) };
+                Ok(sys::SEFLG_SWIEPH)
+            }
+        }
+    }
+
+    fn provenance_locked(&self) -> Result<CalculationProvenance, CalculationError> {
+        let source = match self.mode {
+            EphemerisMode::Moshier => EphemerisSource::Moshier,
+            EphemerisMode::SwissFiles(_) => EphemerisSource::SwissFiles,
+        };
+        Ok(CalculationProvenance::new(
+            "Swiss Ephemeris",
+            native_version(),
+            source,
+            self.data_revision.clone(),
+        )?)
+    }
+}
+
+fn julian_day(instant: astraeus_core::UtcInstant) -> f64 {
+    let instant = instant.as_datetime();
+    let hour = f64::from(instant.hour())
+        + f64::from(instant.minute()) / 60.0
+        + (f64::from(instant.second()) + f64::from(instant.nanosecond()) / 1e9) / 3600.0;
+    // SAFETY: the normalized UTC components are valid scalar inputs.
+    unsafe {
+        sys::swe_julday(
+            instant.year(),
+            instant.month() as i32,
+            instant.day() as i32,
+            hour,
+            sys::SE_GREG_CAL,
+        )
+    }
+}
+
+fn event_error(error: impl ToString) -> EventError {
+    EventError::Provider(error.to_string())
 }
 
 fn path_to_c_string(path: &Path) -> Result<CString, CalculationError> {
