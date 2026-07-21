@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/astraeus-artifacts", "crates/astraeus-comparison", "crates/astraeus-core", "crates/astraeus-derived", "crates/astraeus-fixtures", "crates/astraeus-specifications", "crates/astraeus-swiss", "crates/astraeus-techniques", "crates/astraeus-western"]
+members = ["crates/astraeus-artifacts", "crates/astraeus-comparison", "crates/astraeus-core", "crates/astraeus-derived", "crates/astraeus-events", "crates/astraeus-fixtures", "crates/astraeus-specifications", "crates/astraeus-swiss", "crates/astraeus-techniques", "crates/astraeus-western"]
 resolver = "3"
 
 [workspace.package]
