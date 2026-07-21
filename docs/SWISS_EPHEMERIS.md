@@ -1,0 +1,40 @@
+# Swiss Ephemeris integration policy
+
+No Swiss Ephemeris library, executable, model, or `.se1` data file is included
+in Astraeus at this checkpoint.
+
+## Licensing
+
+Swiss Ephemeris uses a dual-license model: a developer must choose the GNU
+Affero General Public License path or obtain a Swiss Ephemeris Professional
+License before distributing software containing it or activating a public
+service that uses it. The authoritative terms are maintained by Astrodienst:
+<https://www.astro.com/swisseph/swephinfo_e.htm>.
+
+Astraeus is AGPL-3.0-or-later and the planned open-source adapter will use the
+AGPL path. A different licensing choice requires an explicit project decision
+before native integration or distribution. This document is project policy,
+not legal advice.
+
+Ephemeris data files and compiled binaries must not be committed. Users of a
+future adapter will provide their own data path, and tests requiring those
+files will be an explicitly selected integration suite.
+
+## Native global state
+
+Swiss Ephemeris configuration includes process-global state such as the
+ephemeris path and sidereal mode. The first native adapter must therefore:
+
+1. serialize every library interaction behind one process-wide lock;
+2. apply the complete path, zodiac, ayanamsa, and calculation flags while the
+   lock is held for each request;
+3. request speed explicitly and check the returned flags;
+4. reject unsupported objects and every per-object failure;
+5. treat Swiss-file-to-Moshier fallback as an error when Swiss-file mode was
+   selected; and
+6. keep all native calls, including cleanup, inside the same synchronization
+   boundary.
+
+Process isolation may replace the lock later, but concurrent unsynchronized
+access is not permitted. A native dependency is added only after dedicated
+Swiss-file fixtures and contract tests are ready.
