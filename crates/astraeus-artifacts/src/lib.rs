@@ -67,6 +67,10 @@ impl CalculationArtifact {
 
     pub fn from_json(input: &str) -> Result<Self, ArtifactError> {
         let wire: ArtifactWire = serde_json::from_str(input)?;
+        Self::from_wire(wire)
+    }
+
+    fn from_wire(wire: ArtifactWire) -> Result<Self, ArtifactError> {
         if wire.schema_version != SCHEMA_VERSION {
             return Err(ArtifactError::UnsupportedSchema(wire.schema_version));
         }
@@ -106,6 +110,16 @@ impl CalculationArtifact {
 
     pub fn content_id(&self) -> Result<String, ArtifactError> {
         Ok(format!("sha256:{}", self.content_sha256()?))
+    }
+}
+
+impl<'de> Deserialize<'de> for CalculationArtifact {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = ArtifactWire::deserialize(deserializer)?;
+        Self::from_wire(wire).map_err(serde::de::Error::custom)
     }
 }
 

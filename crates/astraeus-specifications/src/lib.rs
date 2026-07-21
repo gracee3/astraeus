@@ -48,6 +48,10 @@ impl ChartSpecification {
 
     pub fn from_json(input: &str) -> Result<Self, SpecificationError> {
         let wire: SpecificationWire = serde_json::from_str(input)?;
+        Self::from_wire(wire)
+    }
+
+    fn from_wire(wire: SpecificationWire) -> Result<Self, SpecificationError> {
         if wire.schema_version != SCHEMA_VERSION {
             return Err(SpecificationError::UnsupportedSchema(wire.schema_version));
         }
@@ -72,6 +76,16 @@ impl ChartSpecification {
 
     pub fn request(&self, instant: UtcInstant, location: GeographicLocation) -> CalculationRequest {
         CalculationRequest::from_options(instant, location, self.calculation.clone())
+    }
+}
+
+impl<'de> Deserialize<'de> for ChartSpecification {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = SpecificationWire::deserialize(deserializer)?;
+        Self::from_wire(wire).map_err(serde::de::Error::custom)
     }
 }
 
