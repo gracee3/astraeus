@@ -1,0 +1,18 @@
+[package]
+name = "astraeus-cli"
+version = "0.1.0"
+description = "Strict JSON artifact utilities for the Astraeus astrology engine"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "astraeus"
+path = "src/main.rs"
+
+[dependencies]
+astraeus-artifacts = { path = "../astraeus-artifacts" }
+astraeus-core = { path = "../astraeus-core" }
+astraeus-swiss = { path = "../astraeus-swiss" }
+serde_json.workspace = true

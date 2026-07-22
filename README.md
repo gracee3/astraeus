@@ -70,6 +70,31 @@ The completed Western milestone is summarized in the [engine requirements
 status](docs/ENGINE_REQUIREMENTS.md), including explicit Oracle Studio and
 licensing boundaries.
 
+## CLI
+
+The `astraeus` binary is a deliberately thin JSON boundary for validated
+calculation artifacts. It does not store people or client data and does not
+perform local-time or location normalization; callers provide an exact UTC
+request in the artifact.
+
+```text
+cargo run -p astraeus-cli -- chart cast request.json
+cargo run -p astraeus-cli -- chart cast request.json --pretty
+cargo run -p astraeus-cli -- artifact canonicalize chart.json
+cargo run -p astraeus-cli -- artifact canonicalize chart.json --pretty
+cargo run -p astraeus-cli -- artifact inspect chart.json
+```
+
+Use `-` or omit the path to read standard input. Invalid, unknown, or
+tampered artifact fields fail before anything is emitted. The canonicalize
+command emits stable compact JSON by default; inspect emits content ID and
+basic request metadata for scripts and composition clients.
+
+`chart cast` accepts a strict `CalculationRequest` with an exact UTC instant
+and coordinates, uses the built-in Moshier provider, and emits a validated
+calculation artifact. It does not resolve local time zones or require Swiss
+ephemeris files.
+
 ## License
 
 AGPL-3.0-or-later. Swiss Ephemeris has its own dual-license requirements; its
