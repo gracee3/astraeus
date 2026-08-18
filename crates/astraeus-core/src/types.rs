@@ -154,6 +154,7 @@ pub struct CalculationProvenance {
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct CalculationProvenanceWire {
     provider: String,
     provider_version: String,
@@ -219,6 +220,10 @@ impl CalculationProvenance {
 pub struct UtcInstant(DateTime<Utc>);
 
 impl UtcInstant {
+    pub fn from_datetime(value: DateTime<Utc>) -> Self {
+        Self(value)
+    }
+
     pub fn parse_rfc3339(value: &str) -> Result<Self, ValidationError> {
         DateTime::parse_from_rfc3339(value)
             .map(|instant| Self(instant.with_timezone(&Utc)))
@@ -275,6 +280,7 @@ impl GeographicLocation {
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct GeographicLocationWire {
     latitude_degrees: f64,
     longitude_degrees: f64,
@@ -478,6 +484,7 @@ impl Position {
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct PositionWire {
     longitude_degrees: f64,
     latitude_degrees: f64,
@@ -549,6 +556,7 @@ impl HouseCusps {
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct HouseCuspsWire {
     cusps_degrees: Vec<f64>,
     angles: ChartAngles,

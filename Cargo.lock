@@ -20,6 +20,7 @@ dependencies = [
  "astraeus-artifacts",
  "astraeus-core",
  "astraeus-swiss",
+ "astraeus-timeseries",
  "serde_json",
 ]
 
@@ -106,7 +107,9 @@ dependencies = [
  "astraeus-events",
  "astraeus-fixtures",
  "astraeus-specifications",
+ "astraeus-timeseries",
  "chrono",
+ "sha2",
  "sweph-sys",
  "tempfile",
 ]
@@ -119,6 +122,20 @@ dependencies = [
  "astraeus-core",
  "astraeus-derived",
  "astraeus-specifications",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+]
+
+[[package]]
+name = "astraeus-timeseries"
+version = "0.1.0"
+dependencies = [
+ "astraeus-artifacts",
+ "astraeus-core",
+ "astraeus-events",
  "chrono",
  "serde",
  "serde_json",

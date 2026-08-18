@@ -2,11 +2,26 @@ use std::collections::BTreeMap;
 
 use astraeus_core::{
     ASPECT_EXACT_TOLERANCE_DEGREES, AngularPosition, Aspect, AspectDefinition, AspectDefinitions,
-    AspectKind, AspectPhase, ChartPointId, ValidationError, calculate_aspects,
+    AspectKind, AspectPhase, ChartPointId, ValidationError, calculate_aspects, measure_aspect,
 };
 
 fn position(longitude: f64) -> AngularPosition {
     position_with_speed(longitude, 0.0)
+}
+
+#[test]
+fn provider_independent_measurement_exposes_signed_error_and_motion() {
+    let measurement = measure_aspect(
+        position_with_speed(359.0, 0.25),
+        position_with_speed(88.0, 1.25),
+        AspectKind::Square,
+    );
+    assert_eq!(measurement.signed_separation_degrees(), 89.0);
+    assert_eq!(measurement.separation_degrees(), 89.0);
+    assert_eq!(measurement.signed_aspect_error_degrees(), -1.0);
+    assert_eq!(measurement.angular_error_degrees(), 1.0);
+    assert_eq!(measurement.relative_speed_degrees_per_day(), 1.0);
+    assert_eq!(measurement.phase(), AspectPhase::Applying);
 }
 
 fn position_with_speed(longitude: f64, speed: f64) -> AngularPosition {

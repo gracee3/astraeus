@@ -10,6 +10,9 @@ use astraeus_events::{
 use astraeus_fixtures::{GoldenFixture, parse_swetest_output};
 use astraeus_specifications::ChartSpecification;
 use astraeus_swiss::SwissEphemerisAdapter;
+use astraeus_timeseries::{
+    AspectTimelineRequest, AspectTimelineSubject, calculate_aspect_timeline,
+};
 use std::sync::Arc;
 
 const FIXTURES: &str = concat!(
@@ -83,6 +86,22 @@ fn swiss_mode_rejects_silent_moshier_fallback() {
     let fixture = fixture("j2000-greenwich-tropical-placidus");
     assert!(matches!(
         adapter.calculate(fixture.request()),
+        Err(CalculationError::DataUnavailable(_))
+    ));
+}
+
+#[test]
+fn pinned_verifier_rejects_missing_and_tampered_files() {
+    let missing = tempfile::tempdir().unwrap();
+    assert!(matches!(
+        SwissEphemerisAdapter::pinned_swiss_files(missing.path()),
+        Err(CalculationError::DataUnavailable(_))
+    ));
+    for name in ["sepl_18.se1", "semo_18.se1", "seas_18.se1"] {
+        std::fs::write(missing.path().join(name), b"not pinned ephemeris data").unwrap();
+    }
+    assert!(matches!(
+        SwissEphemerisAdapter::pinned_swiss_files(missing.path()),
         Err(CalculationError::DataUnavailable(_))
     ));
 }
@@ -190,6 +209,31 @@ fn event_sampling_is_house_independent_and_supports_birth_epoch_ecliptic() {
 }
 
 #[test]
+fn moshier_drives_an_aspect_timeline() {
+    let start = UtcInstant::parse_rfc3339("2024-04-08T00:00:00Z").unwrap();
+    let end = UtcInstant::parse_rfc3339("2024-04-09T00:00:00Z").unwrap();
+    let request = AspectTimelineRequest::new(
+        AspectTimelineSubject::moving_moving(
+            CelestialObject::Sun,
+            CelestialObject::Moon,
+            EventCoordinateFrame::TropicalOfDate,
+        )
+        .unwrap(),
+        astraeus_core::AspectDefinition::new(astraeus_core::AspectKind::Conjunction, 10.0).unwrap(),
+        start,
+        end,
+        21_600,
+    )
+    .unwrap();
+    let artifact = calculate_aspect_timeline(&SwissEphemerisAdapter::moshier(), request).unwrap();
+    assert_eq!(artifact.samples().len(), 5);
+    assert_eq!(
+        artifact.provider_provenance().ephemeris_source(),
+        astraeus_core::EphemerisSource::Moshier
+    );
+}
+
+#[test]
 fn moshier_finds_known_global_eclipse_maxima_and_casts_event_chart() {
     let adapter = SwissEphemerisAdapter::moshier();
     let solar = adapter
@@ -281,11 +325,7 @@ fn moshier_finds_known_global_eclipse_maxima_and_casts_event_chart() {
 #[ignore = "set ASTRAEUS_SWISS_EPHEMERIS_PATH to a directory containing pinned .se1 files"]
 fn swiss_files_match_tropical_and_sidereal_references() {
     let path = std::env::var("ASTRAEUS_SWISS_EPHEMERIS_PATH").unwrap();
-    let adapter = SwissEphemerisAdapter::swiss_files_with_revision(
-        path,
-        "cae9ecd4b201544d85e411aced17660932514d43",
-    )
-    .unwrap();
+    let adapter = SwissEphemerisAdapter::pinned_swiss_files(path).unwrap();
     for (zodiac, ayanamsa, file) in [
         (
             Zodiac::Tropical,
@@ -347,4 +387,32 @@ fn swiss_files_match_tropical_and_sidereal_references() {
             assert!((expected_cusp - actual_cusp).abs() <= 1e-6);
         }
     }
+}
+
+#[test]
+#[ignore = "set ASTRAEUS_SWISS_EPHEMERIS_PATH to the pinned .se1 bundle"]
+fn swiss_files_drive_an_aspect_timeline() {
+    let path = std::env::var("ASTRAEUS_SWISS_EPHEMERIS_PATH").unwrap();
+    let adapter = SwissEphemerisAdapter::pinned_swiss_files(path).unwrap();
+    let start = UtcInstant::parse_rfc3339("2000-01-01T12:00:00Z").unwrap();
+    let end = UtcInstant::parse_rfc3339("2000-01-01T18:00:00Z").unwrap();
+    let request = AspectTimelineRequest::new(
+        AspectTimelineSubject::moving_moving(
+            CelestialObject::Sun,
+            CelestialObject::Chiron,
+            EventCoordinateFrame::TropicalOfDate,
+        )
+        .unwrap(),
+        astraeus_core::AspectDefinition::new(astraeus_core::AspectKind::Trine, 5.0).unwrap(),
+        start,
+        end,
+        3_600,
+    )
+    .unwrap();
+    let artifact = calculate_aspect_timeline(&adapter, request).unwrap();
+    assert_eq!(artifact.samples().len(), 7);
+    assert_eq!(
+        artifact.provider_provenance().data_revision(),
+        Some("cae9ecd4b201544d85e411aced17660932514d43")
+    );
 }

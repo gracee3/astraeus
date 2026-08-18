@@ -61,7 +61,8 @@ swiss-check data_dir=swiss_ephemeris_path:
 # Run the opt-in Swiss-file adapter integration test.
 swiss-test data_dir=swiss_ephemeris_path:
     just swiss-check "{{ data_dir }}"
-    ASTRAEUS_SWISS_EPHEMERIS_PATH="{{ data_dir }}" cargo test -p astraeus-swiss --test adapter --locked -- --ignored --exact swiss_files_match_tropical_and_sidereal_references
+    ASTRAEUS_SWISS_EPHEMERIS_PATH="{{ data_dir }}" cargo test -p astraeus-swiss --test adapter --locked -- --ignored swiss_
+    ASTRAEUS_SWISS_EPHEMERIS_PATH="{{ data_dir }}" cargo test -p astraeus-cli --test cli --locked -- --ignored swiss_
 
 # Download, verify, and test the pinned Swiss Ephemeris data.
 swiss-setup data_dir=swiss_ephemeris_path:

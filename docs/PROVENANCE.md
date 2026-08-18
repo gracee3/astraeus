@@ -20,3 +20,8 @@ user-specific filesystem details do not leak into serialized artifacts.
 Provenance describes a successful calculation, not an attempted one. Failures
 return no partial result and therefore no success provenance. Operational logs
 may separately record failed attempts without changing this domain contract.
+
+An aspect timeline records one provider provenance value for all transit
+samples. Calculation fails if the provider identity, version, source, or data
+revision changes during a request. A moving/fixed request also embeds the fixed
+chart's independent calculation provenance.

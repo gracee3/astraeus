@@ -13,7 +13,8 @@ record; code and fixtures will be imported only after review.
 - A small headless `astraeus-core` crate.
 - Explicit calculation inputs, outputs, validation, and failure semantics.
 - A provider boundary for Swiss Ephemeris and possible future alternatives.
-- Deterministic golden tests against pinned `swetest` and Astrolog output.
+- Deterministic golden tests against pinned `swetest` output in explicit
+  Moshier and Swiss-file modes.
 - No GUI, HTTP service, database, Oracle Studio, tarot, or Magnolia dependency
   until the calculation foundation is independently validated.
 
@@ -42,6 +43,11 @@ APIs, and future composition applications.
 
 The core also provides deterministic [aspect detection](docs/ASPECTS.md) over
 validated positions, with explicit per-aspect orbs and canonical pair ordering.
+
+`astraeus-timeseries` produces schema-v1 [aspect timelines](docs/TIMESERIES.md)
+for one moving/fixed or moving/moving pair. Its canonical JSON includes regular
+waveform samples, refined exact passes, inclusive orb windows, provider
+provenance, and solver guarantees; rendering and interpretation stay downstream.
 
 `astraeus-specifications` provides reusable schema-v1
 [chart specifications](docs/CHART_SPECIFICATIONS.md) that combine calculation
@@ -80,8 +86,8 @@ perform local-time or location normalization; callers provide an exact UTC
 request in the artifact.
 
 ```text
-cargo run -p astraeus-cli -- chart cast request.json
-cargo run -p astraeus-cli -- chart cast request.json --pretty
+cargo run -p astraeus-cli -- chart cast request.json --ephemeris moshier
+cargo run -p astraeus-cli -- timeline aspect examples/timeline-moving-moving.json --ephemeris moshier --pretty
 cargo run -p astraeus-cli -- artifact canonicalize chart.json
 cargo run -p astraeus-cli -- artifact canonicalize chart.json --pretty
 cargo run -p astraeus-cli -- artifact inspect chart.json
@@ -93,9 +99,12 @@ command emits stable compact JSON by default; inspect emits content ID and
 basic request metadata for scripts and composition clients.
 
 `chart cast` accepts a strict `CalculationRequest` with an exact UTC instant
-and coordinates, uses the built-in Moshier provider, and emits a validated
-calculation artifact. It does not resolve local time zones or require Swiss
-ephemeris files.
+and coordinates. `timeline aspect` accepts a strict `AspectTimelineRequest`.
+Both commands require `--ephemeris moshier|swiss-files`. Moshier ignores the
+Swiss path environment and rejects file-only objects such as Chiron. Swiss mode
+uses `--ephemeris-path`, then `ASTRAEUS_SWISS_EPHEMERIS_PATH`, and refuses to
+run unless the three declared files match their pinned SHA-256 hashes. Neither
+command resolves local time zones.
 
 ## Swiss-file setup
 

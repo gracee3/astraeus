@@ -12,7 +12,8 @@ mod types;
 pub use adapter::{DeterministicMock, EphemerisAdapter};
 pub use aspects::{
     ASPECT_EXACT_TOLERANCE_DEGREES, ASPECT_STATION_TOLERANCE_DEGREES_PER_DAY, Aspect,
-    AspectDefinition, AspectDefinitions, AspectKind, AspectPhase, calculate_aspects,
+    AspectDefinition, AspectDefinitions, AspectKind, AspectMeasurement, AspectPhase,
+    calculate_aspects, measure_aspect,
 };
 pub use error::{CalculationError, ValidationError};
 pub use placements::{

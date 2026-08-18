@@ -15,4 +15,5 @@ path = "src/main.rs"
 astraeus-artifacts = { path = "../astraeus-artifacts" }
 astraeus-core = { path = "../astraeus-core" }
 astraeus-swiss = { path = "../astraeus-swiss" }
+astraeus-timeseries = { path = "../astraeus-timeseries" }
 serde_json.workspace = true
