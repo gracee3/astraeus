@@ -85,7 +85,18 @@ at 0°/360°.
 The two `j2000-greenwich-swiss-*.stdout` fixtures exercise Sun, Moon, Chiron,
 houses, speed, and tropical/Lahiri sidereal configuration with `-eswe`.
 `SWISS_PROVENANCE.md` records the immutable data revision and hashes. Run the
-selected adapter suite without copying data into the repository:
+complete local setup, including checksum verification, with:
+
+```text
+just swiss-setup
+eval "$(just swiss-env)"
+```
+
+The default data directory is
+`${XDG_DATA_HOME:-$HOME/.local/share}/astraeus/swisseph`; an existing
+`ASTRAEUS_SWISS_EPHEMERIS_PATH` overrides it. `just swiss-check` is the offline
+integrity check, and `just swiss-test` runs the selected suite. The underlying
+command remains:
 
 ```text
 ASTRAEUS_SWISS_EPHEMERIS_PATH=/path/to/pinned-ephe \

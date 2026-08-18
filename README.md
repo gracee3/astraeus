@@ -97,6 +97,29 @@ and coordinates, uses the built-in Moshier provider, and emits a validated
 calculation artifact. It does not resolve local time zones or require Swiss
 ephemeris files.
 
+## Swiss-file setup
+
+The optional Swiss-file adapter uses three files pinned by revision and SHA-256
+in [the fixture provenance](fixtures/swetest-v2.10.03/SWISS_PROVENANCE.md).
+Download them to the configured XDG data directory and run the selected adapter
+test with:
+
+```text
+just swiss-setup
+```
+
+The default is `${XDG_DATA_HOME:-$HOME/.local/share}/astraeus/swisseph`. Set
+`ASTRAEUS_SWISS_EPHEMERIS_PATH` or pass a directory to the recipe to use a
+different location. To configure the current shell for direct Cargo commands:
+
+```text
+eval "$(just swiss-env)"
+```
+
+`just swiss-check` verifies the installed files without network access, and
+`just swiss-test` reruns the ignored Swiss-file integration test. No `.se1`
+file is committed to this repository.
+
 ## License
 
 AGPL-3.0-or-later. Swiss Ephemeris has its own dual-license requirements; its
