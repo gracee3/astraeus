@@ -32,6 +32,11 @@ and the [Swiss Ephemeris integration policy](docs/SWISS_EPHEMERIS.md).
 Swiss-file modes. Swiss-file mode requires a caller-supplied data directory
 and rejects silent fallback; no ephemeris data is bundled.
 
+`astraeus-moshier` implements the same chart provider contract through the
+pure-Rust `swisseph-rs` Moshier backend. It disables all file/JPL features,
+performs no I/O, compiles for browser WebAssembly, and explicitly rejects
+Chiron and dates outside the analytical ephemeris range.
+
 Every successful result includes validated [calculation provenance](docs/PROVENANCE.md)
 covering its provider, runtime version, ephemeris source, and optional pinned
 data revision.
