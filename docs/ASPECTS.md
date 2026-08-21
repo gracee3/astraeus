@@ -12,6 +12,11 @@ separation and absolute distance from exactitude. When configured windows
 overlap, only the closest aspect is returned for a pair; configuration order
 does not affect results, and canonical aspect-kind order breaks an exact tie.
 
+`measure_aspect` exposes the provider-independent measurement used by detection
+and time-series consumers. `AspectMeasurement` contains signed and absolute
+separation, signed error from the nearest directed branch of the requested
+aspect, absolute angular error, relative longitude speed, and phase.
+
 ## Motion phase
 
 Each detected aspect records signed separation from the canonically first

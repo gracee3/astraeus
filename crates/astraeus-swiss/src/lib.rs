@@ -3,6 +3,8 @@
 use std::{
     collections::BTreeMap,
     ffi::{CStr, CString},
+    fs::File,
+    io::Read,
     os::raw::c_char,
     path::{Path, PathBuf},
     sync::Mutex,
@@ -19,9 +21,26 @@ use astraeus_events::{
     GlobalEclipseProvider,
 };
 use chrono::{Datelike, Timelike};
+use sha2::{Digest, Sha256};
 use sweph_sys as sys;
 
 static SWISS_LOCK: Mutex<()> = Mutex::new(());
+
+pub const PINNED_SWISS_EPHEMERIS_REVISION: &str = "cae9ecd4b201544d85e411aced17660932514d43";
+pub const PINNED_SWISS_EPHEMERIS_FILES: [(&str, &str); 3] = [
+    (
+        "sepl_18.se1",
+        "ca1393ceab3a44fbc895887cf789c68819ae6a1cbc9b22225872dbe4ccd99a66",
+    ),
+    (
+        "semo_18.se1",
+        "1ca07bd67c24374d77226180c20a4f9996cba013697894810518e7eb582ca4f7",
+    ),
+    (
+        "seas_18.se1",
+        "a2cd8fc33807c78ca9a700c91c2e042258b12fc4796519e00781440b5ad8b2e2",
+    ),
+];
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EphemerisMode {
@@ -72,6 +91,12 @@ impl SwissEphemerisAdapter {
         )?;
         adapter.data_revision = Some(revision);
         Ok(adapter)
+    }
+
+    /// Use only the declared Swiss data bundle after verifying every pinned file.
+    pub fn pinned_swiss_files(path: impl AsRef<Path>) -> Result<Self, CalculationError> {
+        verify_pinned_swiss_files(path.as_ref())?;
+        Self::swiss_files_with_revision(path, PINNED_SWISS_EPHEMERIS_REVISION)
     }
 
     pub fn mode(&self) -> &EphemerisMode {
@@ -177,6 +202,47 @@ impl SwissEphemerisAdapter {
         )?;
         CalculationResult::new(request, positions, houses, provenance)
     }
+}
+
+/// Verify the three declared Swiss Ephemeris files and their SHA-256 digests.
+pub fn verify_pinned_swiss_files(path: &Path) -> Result<(), CalculationError> {
+    if !path.is_dir() {
+        return Err(CalculationError::DataUnavailable(format!(
+            "Swiss Ephemeris path is not a directory: {}",
+            path.display()
+        )));
+    }
+    path_to_c_string(path)?;
+    for (name, expected) in PINNED_SWISS_EPHEMERIS_FILES {
+        let file_path = path.join(name);
+        let mut file = File::open(&file_path).map_err(|error| {
+            CalculationError::DataUnavailable(format!(
+                "could not open pinned Swiss Ephemeris file {}: {error}",
+                file_path.display()
+            ))
+        })?;
+        let mut digest = Sha256::new();
+        let mut buffer = [0_u8; 64 * 1024];
+        loop {
+            let count = file.read(&mut buffer).map_err(|error| {
+                CalculationError::DataUnavailable(format!(
+                    "could not read pinned Swiss Ephemeris file {}: {error}",
+                    file_path.display()
+                ))
+            })?;
+            if count == 0 {
+                break;
+            }
+            digest.update(&buffer[..count]);
+        }
+        let actual = format!("{:x}", digest.finalize());
+        if actual != expected {
+            return Err(CalculationError::DataUnavailable(format!(
+                "pinned Swiss Ephemeris file {name} failed SHA-256 verification"
+            )));
+        }
+    }
+    Ok(())
 }
 
 fn calculate_houses(

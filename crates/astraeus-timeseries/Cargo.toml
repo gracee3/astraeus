@@ -1,19 +1,18 @@
 [package]
-name = "astraeus-cli"
+name = "astraeus-timeseries"
 version = "0.1.0"
-description = "Strict JSON artifact utilities for the Astraeus astrology engine"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-
-[[bin]]
-name = "astraeus"
-path = "src/main.rs"
+description = "Canonical aspect time-series artifacts for Astraeus"
 
 [dependencies]
 astraeus-artifacts = { version = "0.1.0", path = "../astraeus-artifacts" }
 astraeus-core = { version = "0.1.0", path = "../astraeus-core" }
-astraeus-swiss = { version = "0.1.0", path = "../astraeus-swiss" }
-astraeus-timeseries = { version = "0.1.0", path = "../astraeus-timeseries" }
+astraeus-events = { version = "0.1.0", path = "../astraeus-events" }
+chrono.workspace = true
+serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true

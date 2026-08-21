@@ -31,6 +31,48 @@ pub enum AspectPhase {
     Stationary,
 }
 
+/// Provider-independent measurements for one directed pair and aspect kind.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct AspectMeasurement {
+    signed_separation_degrees: f64,
+    separation_degrees: f64,
+    signed_aspect_error_degrees: f64,
+    angular_error_degrees: f64,
+    relative_speed_degrees_per_day: f64,
+    phase: AspectPhase,
+}
+
+impl AspectMeasurement {
+    /// Oriented separation from the first point to the second in (-180, 180].
+    pub fn signed_separation_degrees(self) -> f64 {
+        self.signed_separation_degrees
+    }
+
+    /// Absolute shortest separation between the points.
+    pub fn separation_degrees(self) -> f64 {
+        self.separation_degrees
+    }
+
+    /// Signed difference from the nearest directed branch of the exact aspect.
+    pub fn signed_aspect_error_degrees(self) -> f64 {
+        self.signed_aspect_error_degrees
+    }
+
+    /// Absolute distance from exactitude.
+    pub fn angular_error_degrees(self) -> f64 {
+        self.angular_error_degrees
+    }
+
+    /// Longitude speed of the second point minus the first, in degrees per day.
+    pub fn relative_speed_degrees_per_day(self) -> f64 {
+        self.relative_speed_degrees_per_day
+    }
+
+    pub fn phase(self) -> AspectPhase {
+        self.phase
+    }
+}
+
 impl AspectKind {
     pub const fn angle_degrees(self) -> f64 {
         match self {
@@ -268,43 +310,60 @@ pub fn calculate_aspects(
         let (first, first_position) = *entry;
         for entry in &entries[index + 1..] {
             let (second, second_position) = *entry;
-            let signed_separation = signed_separation(
-                first_position.longitude_degrees(),
-                second_position.longitude_degrees(),
-            );
-            let separation = signed_separation.abs();
-            let relative_speed = second_position.longitude_speed_degrees_per_day()
-                - first_position.longitude_speed_degrees_per_day();
             let best = definitions
                 .as_slice()
                 .iter()
                 .map(|definition| {
-                    let orb = (separation - definition.kind().angle_degrees()).abs();
-                    (definition, orb)
+                    let measurement =
+                        measure_aspect(*first_position, *second_position, definition.kind());
+                    (definition, measurement)
                 })
-                .filter(|(definition, orb)| *orb <= definition.orb_degrees())
-                .min_by(
-                    |(left_definition, left_orb), (right_definition, right_orb)| {
-                        left_orb
-                            .total_cmp(right_orb)
-                            .then_with(|| left_definition.kind().cmp(&right_definition.kind()))
-                    },
-                );
-            if let Some((definition, orb)) = best {
+                .filter(|(definition, measurement)| {
+                    measurement.angular_error_degrees() <= definition.orb_degrees()
+                })
+                .min_by(|(left_definition, left), (right_definition, right)| {
+                    left.angular_error_degrees()
+                        .total_cmp(&right.angular_error_degrees())
+                        .then_with(|| left_definition.kind().cmp(&right_definition.kind()))
+                });
+            if let Some((definition, measurement)) = best {
                 aspects.push(Aspect {
                     first: *first,
                     second: *second,
                     kind: definition.kind(),
-                    separation_degrees: separation,
-                    signed_separation_degrees: signed_separation,
-                    orb_degrees: orb,
-                    relative_speed_degrees_per_day: relative_speed,
-                    phase: classify_phase(signed_separation, definition.kind(), relative_speed),
+                    separation_degrees: measurement.separation_degrees(),
+                    signed_separation_degrees: measurement.signed_separation_degrees(),
+                    orb_degrees: measurement.angular_error_degrees(),
+                    relative_speed_degrees_per_day: measurement.relative_speed_degrees_per_day(),
+                    phase: measurement.phase(),
                 });
             }
         }
     }
     aspects
+}
+
+/// Measure one directed pair against one exact aspect angle.
+pub fn measure_aspect(
+    first: AngularPosition,
+    second: AngularPosition,
+    kind: AspectKind,
+) -> AspectMeasurement {
+    let signed_separation =
+        signed_separation(first.longitude_degrees(), second.longitude_degrees());
+    let separation = signed_separation.abs();
+    let signed_target = signed_target(signed_separation, kind);
+    let signed_error = signed_separation - signed_target;
+    let relative_speed =
+        second.longitude_speed_degrees_per_day() - first.longitude_speed_degrees_per_day();
+    AspectMeasurement {
+        signed_separation_degrees: signed_separation,
+        separation_degrees: separation,
+        signed_aspect_error_degrees: signed_error,
+        angular_error_degrees: signed_error.abs(),
+        relative_speed_degrees_per_day: relative_speed,
+        phase: classify_phase_from_error(signed_error, relative_speed),
+    }
 }
 
 fn signed_separation(first_longitude: f64, second_longitude: f64) -> f64 {
@@ -317,18 +376,27 @@ fn signed_separation(first_longitude: f64, second_longitude: f64) -> f64 {
 }
 
 fn classify_phase(signed_separation: f64, kind: AspectKind, relative_speed: f64) -> AspectPhase {
+    classify_phase_from_error(
+        signed_separation - signed_target(signed_separation, kind),
+        relative_speed,
+    )
+}
+
+fn signed_target(signed_separation: f64, kind: AspectKind) -> f64 {
     let angle = kind.angle_degrees();
-    let signed_target = if signed_separation < 0.0 {
+    if signed_separation < 0.0 {
         -angle
     } else {
         angle
-    };
-    let deviation = signed_separation - signed_target;
-    if deviation.abs() <= ASPECT_EXACT_TOLERANCE_DEGREES {
+    }
+}
+
+fn classify_phase_from_error(signed_error: f64, relative_speed: f64) -> AspectPhase {
+    if signed_error.abs() <= ASPECT_EXACT_TOLERANCE_DEGREES {
         AspectPhase::Exact
     } else if relative_speed.abs() <= ASPECT_STATION_TOLERANCE_DEGREES_PER_DAY {
         AspectPhase::Stationary
-    } else if deviation * relative_speed < 0.0 {
+    } else if signed_error * relative_speed < 0.0 {
         AspectPhase::Applying
     } else {
         AspectPhase::Separating

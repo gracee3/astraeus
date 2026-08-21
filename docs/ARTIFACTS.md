@@ -35,3 +35,7 @@ content identifiers.
 Artifacts deliberately omit creation time, storage identifiers, people,
 sessions, and filesystem paths. Applications may wrap an artifact with those
 concerns without changing the calculation identity.
+
+Aspect time series use their own schema-v1 envelope and content identity rather
+than extending calculation artifact schema v1. See [aspect time
+series](TIMESERIES.md).

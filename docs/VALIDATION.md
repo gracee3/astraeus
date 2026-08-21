@@ -102,8 +102,8 @@ eval "$(just swiss-env)"
 The default data directory is
 `${XDG_DATA_HOME:-$HOME/.local/share}/astraeus/swisseph`; an existing
 `ASTRAEUS_SWISS_EPHEMERIS_PATH` overrides it. `just swiss-check` is the offline
-integrity check, and `just swiss-test` runs the selected suite. The underlying
-command remains:
+integrity check, and `just swiss-test` runs the selected adapter, pinned-bundle,
+time-series, and CLI cases. The underlying golden comparison remains:
 
 ```text
 ASTRAEUS_SWISS_EPHEMERIS_PATH=/path/to/pinned-ephe \

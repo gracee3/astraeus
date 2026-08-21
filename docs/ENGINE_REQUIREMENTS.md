@@ -6,6 +6,7 @@ Astraeus scope document, not an Oracle Studio application roadmap.
 | Capability | Status | Implementation boundary |
 | --- | --- | --- |
 | Validated tropical/sidereal chart calculations | Complete | Core contracts plus explicit Moshier/Swiss-file adapter modes |
+| One-pair aspect time series | Complete | Canonical schema-v1 samples, exact passes, orb windows, and explicit provider provenance |
 | Angles, houses, signs, South Nodes, aspects, and motion phase | Complete | Typed derived chart artifacts with strict revalidation |
 | Traditional/modern rulership, dignity, and two decan policies | Complete | Versioned Western policy artifacts |
 | Synastry, transit, event, return, progressed, harmonic, and research comparisons | Complete | Physical, progressed, and synthetic chart layers with explicit motion policy |

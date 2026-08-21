@@ -73,14 +73,12 @@ The GitHub account is `gracee3`. No repository named for tarot or Oracle current
 - `gracee3/crius-jpl`: public Python JPL adapter. Use its provider-separation and test ideas as reference. Its README's mixed Swiss/JPL licensing claims require review before copying code.
 - `gracee3/gaia`: private full-stack astrology workspace with a structured backend, API types, wheel definitions, and renderer packages. This is the strongest source for product requirements and prior API/UI behavior.
 - `gracee3/ouranos`: private earlier FastAPI/React implementation with extensive chart controls and wheel rendering. Use as a feature and interaction inventory.
-- `gracee3/astrolog-ui`: private Astrolog wrapper/UI experiment. Use for command-builder requirements and workflow fixtures, not as an application base.
 - `gracee3/swetest-api`: private small Python wrapper. Use only as a validation/reference harness if its expected outputs are trustworthy.
 
 ### Archive-only material
 
-- `gracee3/astro`: private, approximately 38 MB, mixing scripts, ephemeris files, generated CSV/PNG output, Python caches, Astrolog data, and personal chart material. Never use this repository wholesale as a clean seed.
+- `gracee3/astro`: private, approximately 38 MB, mixing scripts, ephemeris files, generated CSV/PNG output, Python caches, third-party calculation data, and personal chart material. Never use this repository wholesale as a clean seed.
 - `gracee3/talisman`: private earlier Magnolia-shaped snapshot, not a tarot implementation despite its name.
-- `gracee3/Astrolog`: public fork of Astrolog. Keep as an independent external reference; do not vendor the full program into Astraeus.
 
 ## Clean-start policy
 
@@ -108,7 +106,7 @@ Build Astraeus in staged checkpoints:
 
 1. Start with documentation, licensing, a pinned Rust toolchain, and an empty `astraeus-core` crate.
 2. Define calculation inputs, outputs, errors, and an ephemeris adapter trait before importing an adapter implementation.
-3. Import requirements and verified fixtures from Aphrodite, Crius, Gaia, Ouranos, `swetest`, and Astrolog rather than copying entire implementations.
+3. Import requirements and verified fixtures from Aphrodite, Crius, Gaia, Ouranos, and pinned `swetest` output rather than copying entire implementations.
 4. Implement or selectively import the Swiss adapter with correct path setup, ayanamsas, speed flags, errors, and global-state handling.
 5. Establish deterministic golden tests before importing aspects, chart specifications, Jyotish, UI, or API code.
 6. Treat all legacy README completion claims as historical until Astraeus tests substantiate them.
@@ -126,7 +124,7 @@ Build a small, validated Rust astrology engine whose calculation results are det
 - Active clean repository: `git@github.com:gracee3/astraeus.git`.
 - Legacy Rust source: `https://github.com/gracee3/aphrodite-rust` at `e8d9580f119fcf39ccc39d7ac9265d9689f1c274`.
 - Local legacy checkout, when available: `/home/emmy/git/aphrodite-rust`.
-- Additional requirements/fixture sources: `aphrodite-d3`, `crius-ephemeris-core`, `crius-swiss`, `crius-jpl`, private `gaia`, private `ouranos`, private `astrolog-ui`, private `swetest-api`, and the Astrolog fork.
+- Additional requirements/fixture sources: `aphrodite-d3`, `crius-ephemeris-core`, `crius-swiss`, `crius-jpl`, private `gaia`, private `ouranos`, and private `swetest-api`.
 
 ### Known legacy defects
 
@@ -148,7 +146,7 @@ The legacy workspace is evidence, not a validated engine:
 1. Create the minimal `astraeus-core` crate with no UI, HTTP, database, Magnolia, or Oracle dependencies.
 2. Define validated UTC time, geographic location, object, zodiac, ayanamsa, house-system, position, house, and calculation-error types.
 3. Define an ephemeris adapter trait and a deterministic mock adapter.
-4. Add fixed golden-fixture file formats and a harness capable of comparing Astraeus output to `swetest`/Astrolog reference output.
+4. Add fixed golden-fixture file formats and a harness capable of comparing Astraeus output to pinned `swetest` reference output.
 5. Document Swiss Ephemeris licensing and global-state constraints before adding the native dependency.
 6. Add the Swiss adapter only after the contract and failure semantics have tests.
 
