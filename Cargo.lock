@@ -90,6 +90,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "astraeus-moshier"
+version = "0.1.0"
+dependencies = [
+ "astraeus-core",
+ "astraeus-fixtures",
+ "chrono",
+ "swisseph-rs",
+]
+
+[[package]]
 name = "astraeus-specifications"
 version = "0.1.0"
 dependencies = [
@@ -419,6 +429,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e09076a262af442f92d0a02519cc6f34a9d42fe0b698be78fe5663bde509e16"
 dependencies = [
  "cc",
+]
+
+[[package]]
+name = "swisseph-rs"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d95cf848ff566c12171b0fcfd8c3acbe68b5fe4c57822b701e215a5e38ca7d7"
+dependencies = [
+ "bitflags",
 ]
 
 [[package]]

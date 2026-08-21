@@ -80,6 +80,13 @@ degrees/day), angle-speed tolerance is `0.005` degrees/day, and distance
 tolerance is `1e-9` AU. Longitude and house comparisons account for wrap-around
 at 0°/360°.
 
+The pure-Rust Moshier adapter applies one documented exception: true-node speed
+uses a `5e-6` degrees/day tolerance. `swisseph-rs` reproduces the fixture's
+positions and all other values at the ordinary tolerances, but its stateless
+off-center samples do not reproduce the native library's global
+obliquity/nutation cache rounding for this derivative (a difference below
+`4e-6` degrees/day).
+
 ## Swiss-file suite
 
 The two `j2000-greenwich-swiss-*.stdout` fixtures exercise Sun, Moon, Chiron,

@@ -1,5 +1,18 @@
 # Swiss Ephemeris integration policy
 
+## Pure-Rust Moshier adapter
+
+`astraeus-moshier` uses `swisseph-rs` 0.2.0 with default features disabled.
+The resulting provider is stateless, file-free, and browser-compatible. Its
+successful provenance names `swisseph-rs Moshier` version `0.2.0` and the
+`moshier` source. It rejects Chiron and epochs outside the shared Moshier
+planetary/lunar range rather than falling back or returning partial output.
+
+The dependency is an AGPL-3.0-or-later pure-Rust port of Swiss Ephemeris
+2.10.03. Astraeus distributes it under the same AGPL path described below.
+
+## Native Swiss adapter
+
 The `astraeus-swiss` crate uses the exactly pinned `sweph-sys` 0.3.0 raw
 binding, which vendors Swiss Ephemeris C source. No executable or `.se1` data
 file is committed.
