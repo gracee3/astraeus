@@ -67,6 +67,41 @@ fn square() -> AspectDefinitions {
 }
 
 #[test]
+fn point_selection_accessors_preserve_declared_order_and_json_shape() {
+    let first = [
+        ChartPointId::Moon,
+        ChartPointId::Sun,
+        ChartPointId::Ascendant,
+    ];
+    let second = [
+        ChartPointId::Vertex,
+        ChartPointId::Mars,
+        ChartPointId::Midheaven,
+    ];
+    let specification = ComparisonSpecification::new(
+        ComparisonKind::Generic,
+        square(),
+        ChartPointSelection::new(first.to_vec()).unwrap(),
+        ChartPointSelection::new(second.to_vec()).unwrap(),
+        ComparisonMotionPolicy::BothInstantaneous,
+    )
+    .unwrap();
+
+    assert_eq!(specification.first_points().as_slice(), first);
+    assert_eq!(specification.second_points().as_slice(), second);
+
+    let json = serde_json::to_string(&specification).unwrap();
+    assert_eq!(
+        json,
+        r#"{"kind":"generic","aspects":[{"kind":"square","orb_degrees":2.0}],"first_points":["moon","sun","ascendant"],"second_points":["vertex","mars","midheaven"],"motion":"both_instantaneous"}"#
+    );
+    let decoded: ComparisonSpecification = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded.first_points().as_slice(), first);
+    assert_eq!(decoded.second_points().as_slice(), second);
+    assert_eq!(serde_json::to_string(&decoded).unwrap(), json);
+}
+
+#[test]
 fn same_point_across_layers_is_valid_and_synastry_has_no_phase() {
     let specification = ComparisonSpecification::synastry(
         AspectDefinitions::new(vec![
@@ -158,9 +193,13 @@ fn comparison_artifact_round_trips_and_rejects_tampering() {
     )
     .unwrap();
     let json = artifact.to_json().unwrap();
-    assert_eq!(ComparisonArtifact::from_json(&json).unwrap(), artifact);
+    let content_id = artifact.content_id().unwrap();
+    let decoded = ComparisonArtifact::from_json(&json).unwrap();
+    assert_eq!(decoded, artifact);
+    assert_eq!(decoded.to_json().unwrap(), json);
+    assert_eq!(decoded.content_id().unwrap(), content_id);
     assert_eq!(
-        artifact.content_id().unwrap(),
+        content_id,
         format!("sha256:{}", artifact.content_sha256().unwrap())
     );
     assert!(matches!(

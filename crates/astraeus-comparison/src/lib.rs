@@ -186,6 +186,16 @@ impl ComparisonSpecification {
         self.kind
     }
 
+    /// Returns the first layer's points in their declared selection order.
+    pub const fn first_points(&self) -> &ChartPointSelection {
+        &self.first_points
+    }
+
+    /// Returns the second layer's points in their declared selection order.
+    pub const fn second_points(&self) -> &ChartPointSelection {
+        &self.second_points
+    }
+
     pub const fn motion(&self) -> ComparisonMotionPolicy {
         self.motion
     }
