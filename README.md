@@ -1,6 +1,6 @@
 # Astraeus
 
-**Status:** Active research software. Core artifact and validation contracts are implemented, while interfaces remain pre-1.0. Automatic CI is currently manual-dispatch, so published checkpoints should be tied to a passing run or documented local acceptance.
+**Status:** Active research software. Core artifact and validation contracts are implemented, while interfaces remain pre-1.0. GitHub Actions is intentionally disabled during rapid feature development; published checkpoints rely on documented local acceptance.
 
 Astraeus is a validation-first Rust astrology and ephemeris engine.
 

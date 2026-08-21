@@ -22,6 +22,12 @@ require ephemeris downloads, personal charts, a GUI, Docker, models, datasets,
 or special hardware. External Swiss-file or reference-tool validation requires
 an explicit selected suite and separately reviewed fixture provenance.
 
+GitHub Actions is intentionally disabled during rapid feature development.
+Do not add, enable, dispatch, or wait for repository workflows. This does not
+relax local validation: run the relevant native Rust, fixture, integration, and
+end-to-end checks for the change and report the exact commands and results in
+the pull request.
+
 ## Correctness, provenance, and delivery
 
 - Validate public constructors and every deserialization path; reject partial,
@@ -35,6 +41,6 @@ an explicit selected suite and separately reviewed fixture provenance.
   reference licenses before copying code or fixtures.
 - Use a focused feature branch. Commit and push the validated change and open a
   pull request; incomplete or higher-risk work stays draft.
-- After publication, send the exact commit, PR, validation, outcome, risks, and
-  next action to the repository's external coordination record. Do not claim
-  completion until that remote handoff is verified.
+- Record the exact commit, PR, local validation, outcome, risks, and next action
+  in the linked GitHub issue or pull request. No external weekly or portfolio
+  handoff is required.
