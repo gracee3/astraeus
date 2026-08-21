@@ -12,8 +12,8 @@ name = "astraeus"
 path = "src/main.rs"
 
 [dependencies]
-astraeus-artifacts = { path = "../astraeus-artifacts" }
-astraeus-core = { path = "../astraeus-core" }
-astraeus-swiss = { path = "../astraeus-swiss" }
-astraeus-timeseries = { path = "../astraeus-timeseries" }
+astraeus-artifacts = { version = "0.1.0", path = "../astraeus-artifacts" }
+astraeus-core = { version = "0.1.0", path = "../astraeus-core" }
+astraeus-swiss = { version = "0.1.0", path = "../astraeus-swiss" }
+astraeus-timeseries = { version = "0.1.0", path = "../astraeus-timeseries" }
 serde_json.workspace = true
