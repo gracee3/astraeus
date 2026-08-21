@@ -1,12 +1,27 @@
 # Astraeus
 
-**Status:** Active research software. Core artifact and validation contracts are implemented, while interfaces remain pre-1.0. Automatic CI is currently manual-dispatch, so published checkpoints should be tied to a passing run or documented local acceptance.
+**Status:** Archived standalone source. Active Astraeus development moved to
+[Oracle Studio](https://github.com/gracee3/oracle-studio), where the complete
+workspace and Git history are maintained together.
+
+The consolidated engine crates remain under
+[`crates/astraeus-*`](https://github.com/gracee3/oracle-studio/tree/main/crates),
+with engine documentation under
+[`docs/astraeus`](https://github.com/gracee3/oracle-studio/tree/main/docs/astraeus),
+fixtures under
+[`fixtures/astraeus`](https://github.com/gracee3/oracle-studio/tree/main/fixtures/astraeus),
+and examples under
+[`examples/astraeus`](https://github.com/gracee3/oracle-studio/tree/main/examples/astraeus).
+The [migration record](https://github.com/gracee3/oracle-studio/blob/main/docs/astraeus/MIGRATION.md)
+documents the full-history import, path mapping, verification, and extraction
+procedure.
+
+This repository preserves the standalone branches, tags, issues, and release
+history. Its final standalone checkpoint is the annotated tag
+`astraeus-standalone-final`, resolving to commit
+`44af176ef8a85db2bbd7b57228710855a8fe6f3b`.
 
 Astraeus is a validation-first Rust astrology and ephemeris engine.
-
-The project is intentionally beginning with a clean history. The former
-`gracee3/aphrodite-rust` repository remains the legacy source and provenance
-record; code and fixtures will be imported only after review.
 
 ## Initial scope
 
